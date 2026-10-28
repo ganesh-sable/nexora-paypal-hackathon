@@ -1,0 +1,26 @@
+# Environment Variables & Credentials
+.env
+.env.*
+!.env.example
+*.env
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor Files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Log files and Temporary Files
+*.log
+tmp/
+temp/
+
+# Database dumps containing production/sensitive data
+*.dump
+*.backup
+*.bak
