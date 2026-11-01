@@ -4,12 +4,16 @@
 -- ========================================================
 
 -- Drop tables if needed (cascade to clean dependencies)
+DROP TABLE IF EXISTS user_remember_tokens CASCADE;
+DROP TABLE IF EXISTS password_resets CASCADE;
+DROP TABLE IF EXISTS login_attempts CASCADE;
 DROP TABLE IF EXISTS delivery_timeline CASCADE;
 DROP TABLE IF EXISTS product_deliveries CASCADE;
 DROP TABLE IF EXISTS transactions CASCADE;
 DROP TABLE IF EXISTS order_items CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
 
@@ -52,6 +56,7 @@ CREATE TABLE customers (
     phone VARCHAR(50),
     address TEXT NOT NULL,
     city VARCHAR(100) NOT NULL,
+    state VARCHAR(100),
     zip VARCHAR(20) NOT NULL,
     country VARCHAR(100) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -59,25 +64,52 @@ CREATE TABLE customers (
 
 CREATE INDEX idx_customers_email ON customers(email);
 
--- 4. Orders Table
+-- 4. Users Table (Authentication)
+CREATE TABLE users (
+    id BIGSERIAL PRIMARY KEY,
+    full_name VARCHAR(150) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'customer',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    email_verified_at TIMESTAMPTZ NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_users_email ON users(email);
+
+-- 5. Orders Table
 CREATE TABLE orders (
     id SERIAL PRIMARY KEY,
     order_number VARCHAR(50) NOT NULL UNIQUE,
+    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
     customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     customer_name VARCHAR(200) NOT NULL,
     customer_email VARCHAR(255) NOT NULL,
     shipping_address TEXT NOT NULL,
     city VARCHAR(100) NOT NULL,
+    state VARCHAR(100),
     zip VARCHAR(20) NOT NULL,
     country VARCHAR(100) NOT NULL,
     total_amount NUMERIC(10, 2) NOT NULL,
-    payment_status VARCHAR(50) NOT NULL DEFAULT 'Paid', -- Paid, Pending, Failed, Refunded
+    payment_status VARCHAR(50) NOT NULL DEFAULT 'Paid', -- Paid, Pending, Failed, Refunded, Refund Pending, Cancelled
     order_status VARCHAR(50) NOT NULL DEFAULT 'Confirmed', -- Confirmed, Processing, Shipped, Delivered, Cancelled
+    paypal_order_id VARCHAR(100),
+    paypal_capture_id VARCHAR(100),
+    cancelled_at TIMESTAMP WITH TIME ZONE,
+    cancel_reason TEXT,
+    refund_id VARCHAR(100),
+    refund_status VARCHAR(50),
+    refunded_amount NUMERIC(10, 2),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_customer ON orders(customer_id);
 CREATE INDEX idx_orders_number ON orders(order_number);
+CREATE INDEX idx_orders_paypal_order_id ON orders(paypal_order_id);
+CREATE INDEX idx_orders_paypal_capture_id ON orders(paypal_capture_id);
 
 -- 5. Order Items Table
 CREATE TABLE order_items (
@@ -142,3 +174,38 @@ CREATE TABLE transactions (
 CREATE INDEX idx_transactions_order ON transactions(order_id);
 CREATE INDEX idx_transactions_ref ON transactions(transaction_ref);
 CREATE INDEX idx_transactions_status ON transactions(payment_status);
+
+-- 9. Login Attempts Table (Brute-Force Rate Limiting)
+CREATE TABLE login_attempts (
+    id BIGSERIAL PRIMARY KEY,
+    ip_address VARCHAR(45) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    attempted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_login_attempts_ip_time ON login_attempts(ip_address, attempted_at);
+CREATE INDEX idx_login_attempts_email_time ON login_attempts(email, attempted_at);
+
+-- 10. Password Resets Table
+CREATE TABLE password_resets (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_password_resets_token ON password_resets(token_hash);
+CREATE INDEX idx_password_resets_user ON password_resets(user_id);
+
+-- 11. User Remember Me Tokens Table
+CREATE TABLE user_remember_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_remember_tokens_hash ON user_remember_tokens(token_hash);

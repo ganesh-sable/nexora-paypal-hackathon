@@ -29,7 +29,7 @@ SELECT setval('categories_id_seq', (SELECT MAX(id) FROM categories));
 
 -- 2. Products (240 items with real images)
 INSERT INTO products (id, category_id, name, price, description, emoji, badge, stock, rating, reviews_count, image_url) VALUES
-(101, 1, 'Flagship Pro 5G Smartphone 256GB', 899.99, 'Ultra-fast processor, 6.7-inch AMOLED 120Hz display, 108MP triple camera and 5000mAh all-day battery.', '📱', 'Best Seller', 45, 4.8, 128, 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=600&auto=format&fit=crop&q=80'),
+(101, 1, 'Samsung Galaxy Flagship 5G Smartphone 256GB', 899.99, 'Ultra-fast processor, 6.7-inch AMOLED 120Hz display, 108MP triple camera and 5000mAh all-day battery.', '📱', 'Best Seller', 45, 4.8, 128, 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=600&auto=format&fit=crop&q=80'),
 (102, 1, 'Ultra Slim 11" Entertainment Tablet', 499.99, 'High-resolution 2.5K screen, quad speakers with Dolby Atmos, 128GB storage and stylus pen support.', '📱', 'Top Rated', 32, 4.7, 95, 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80'),
 (103, 1, '20,000mAh Fast-Charging Power Bank', 39.99, 'Dual USB-C and USB-A outputs, 22.5W Power Delivery, compact airline-approved portable charger.', '🔋', 'Popular', 85, 4.6, 210, 'https://images.unsplash.com/photo-1609592426861-f0b2f5670868?w=600&auto=format&fit=crop&q=80'),
 (104, 1, '65W GaN 3-Port Fast Wall Charger', 29.99, 'Next-generation gallium nitride technology, charge laptop, phone and earbuds simultaneously.', '🔌', 'Hot', 110, 4.9, 340, 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80'),
@@ -44,7 +44,7 @@ INSERT INTO products (id, category_id, name, price, description, emoji, badge, s
 (201, 2, 'Ultrabook 14" Intel Core i7 16GB/512GB', 1099.99, 'Feather-light 1.2kg magnesium chassis, Intel Iris Xe graphics, 14-hour battery and backlit keyboard.', '💻', 'Best Seller', 20, 4.8, 86, 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=600&auto=format&fit=crop&q=80'),
 (202, 2, 'High-Performance 16" RTX Gaming Laptop', 1499.99, 'AMD Ryzen 7, NVIDIA RTX 4060, 165Hz QHD display, 32GB RAM and dual fan liquid cooling.', '💻', 'Top Rated', 15, 4.9, 115, 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=600&auto=format&fit=crop&q=80'),
 (203, 2, 'All-in-One 27" 4K Desktop Computer', 1199.99, 'Borderless 4K UHD display, wireless keyboard and mouse, pop-up privacy webcam and 1TB SSD.', '🖥️', 'Popular', 12, 4.7, 44, 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600&auto=format&fit=crop&q=80'),
-(204, 2, 'Mini PC AMD Ryzen 7 32GB DDR5', 549.99, 'Pocket-sized workstation supporting triple 4K displays, WiFi 6E and ultra-quiet silent fan.', '🖥️', 'New Arrival', 28, 4.8, 59, 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=600&auto=format&fit=crop&q=80'),
+(204, 2, 'Essential 14" Slim Student Laptop (8GB/256GB SSD)', 399.99, 'Affordable lightweight everyday laptop with Intel processor, HD anti-glare screen, 8GB RAM, fast 256GB SSD, and 10-hour battery.', '💻', 'Budget Pick', 28, 4.8, 59, 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=600&auto=format&fit=crop&q=80'),
 (205, 2, '27" Curved 165Hz IPS Gaming Monitor', 279.99, '1ms response time, 1500R curvature, AMD FreeSync Premium and HDR10 vibrant contrast.', '🖥️', 'Hot', 35, 4.7, 168, 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600&auto=format&fit=crop&q=80'),
 (206, 2, '34" Ultrawide WQHD Productivity Monitor', 449.99, '21:9 aspect ratio, USB-C 90W power delivery dock, height-adjustable stand and sRGB 99%.', '🖥️', 'Staff Pick', 18, 4.9, 92, 'https://images.unsplash.com/photo-1547119957-637f8679db1e?w=600&auto=format&fit=crop&q=80'),
 (207, 2, 'RGB Hot-Swappable Mechanical Keyboard', 89.99, 'Custom tactile switches, sound dampening foam, programmable macros and PBT double-shot keycaps.', '⌨️', 'Best Seller', 65, 4.8, 230, 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600&auto=format&fit=crop&q=80'),
@@ -313,7 +313,7 @@ SELECT setval('product_deliveries_id_seq', (SELECT MAX(id) FROM product_deliveri
 
 -- 7. Delivery Timeline Checkpoints
 INSERT INTO delivery_timeline (id, delivery_id, status, location, activity_description, event_time) VALUES
-(1, 1, 'Order Confivered', 'Central Fulfillment Center', 'Order verified and packed in protective carton', CURRENT_TIMESTAMP - INTERVAL '5 days'),
+(1, 1, 'Order Confirmed', 'Central Fulfillment Center', 'Order verified and packed in protective carton', CURRENT_TIMESTAMP - INTERVAL '5 days'),
 (2, 1, 'Dispatched', 'Logistics Hub, Portland', 'Package picked up by FedEx courier', CURRENT_TIMESTAMP - INTERVAL '4 days'),
 (3, 1, 'In Transit', 'FedEx Hub, Eugene, OR', 'Arrived at transit facility and departed', CURRENT_TIMESTAMP - INTERVAL '2 days'),
 (4, 1, 'Out for Delivery', 'Springfield Station', 'Loaded onto delivery truck with courier Mike', CURRENT_TIMESTAMP - INTERVAL '1 day 4 hours'),

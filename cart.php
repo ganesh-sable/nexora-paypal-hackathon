@@ -101,8 +101,14 @@ foreach ($cart as $id => $qty) {
             <span>$<?php echo number_format($subtotal, 2); ?></span>
         </div>
 
+        <?php if (!Auth::isLoggedIn()): ?>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:0.85rem;margin:1rem 0;font-size:0.88rem;color:#166534;">
+                🔒 <strong>Guest Shopper:</strong> You will be prompted to sign in or create an account to finalize your order. Your items are securely saved.
+            </div>
+        <?php endif; ?>
+
         <div class="actions" style="margin-top:1.25rem;">
-            <a href="checkout.php" class="btn btn-success" style="flex:1;">Proceed to Checkout</a>
+            <a href="checkout.php" class="btn btn-success" style="flex:1;">Proceed to Checkout →</a>
         </div>
         <div class="actions">
             <a href="index.php" class="btn btn-outline" style="flex:1;">Continue Shopping</a>

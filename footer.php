@@ -15,5 +15,8 @@
         <p>© 2026 Nexora | E-Commerce Architecture</p>
     </div>
 </footer>
+
+<?php require_once __DIR__ . '/chat_widget.php'; ?>
+
 </body>
 </html>

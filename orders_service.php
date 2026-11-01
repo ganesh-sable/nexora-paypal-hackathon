@@ -5,14 +5,21 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/products.php';
+require_once __DIR__ . '/paypal_service.php';
 
 class OrdersService {
 
     /**
      * Create a complete order with delivery tracking and transaction history
      */
-    public static function createOrder(array $customerData, array $cartItems, float $totalAmount, array $paymentData): array {
+    public static function createOrder(array $customerData, array $cartItems, float $totalAmount, array $paymentData, ?int $userId = null): array {
+        if ($userId === null && Auth::isLoggedIn()) {
+            $user = Auth::currentUser();
+            $userId = isset($user['id']) ? (int)$user['id'] : null;
+        }
+
         $orderNumber = 'ORD-' . date('Y') . '-' . strtoupper(substr(uniqid(), -5));
         $trackingNumber = 'TRK-' . strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $paymentData['method'] ?? 'EXP'), 0, 4)) . '-' . mt_rand(100000, 999999);
         $transactionRef = 'TXN-' . mt_rand(100000, 999999) . '-' . strtoupper(substr(md5(uniqid()), 0, 4));
@@ -31,7 +38,7 @@ class OrdersService {
                 $pdo->beginTransaction();
 
                 // 1. Insert or find customer
-                $stmt = $pdo->prepare("INSERT INTO customers (first_name, last_name, email, phone, address, city, zip, country) 
+                $stmt = $pdo->prepare("INSERT INTO customers (first_name, last_name, email, phone, address, city, zip, country)
                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id");
                 $stmt->execute([
                     $customerData['first_name'],
@@ -47,10 +54,11 @@ class OrdersService {
 
                 // 2. Insert order
                 $custFullName = $customerData['first_name'] . ' ' . $customerData['last_name'];
-                $stmt = $pdo->prepare("INSERT INTO orders (order_number, customer_id, customer_name, customer_email, shipping_address, city, zip, country, total_amount, payment_status, order_status)
-                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Paid', 'Confirmed') RETURNING id");
+                $stmt = $pdo->prepare("INSERT INTO orders (order_number, user_id, customer_id, customer_name, customer_email, shipping_address, city, zip, country, total_amount, payment_status, order_status)
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Paid', 'Confirmed') RETURNING id");
                 $stmt->execute([
                     $orderNumber,
+                    $userId,
                     $customerId,
                     $custFullName,
                     $customerData['email'],
@@ -117,7 +125,9 @@ class OrdersService {
 
         // Store latest order in session as well for immediate display
         $orderRecord = [
+            'id'               => $orderId ?: mt_rand(100, 999),
             'order_id'         => $orderId ?: mt_rand(100, 999),
+            'user_id'          => $userId,
             'order_number'     => $orderNumber,
             'customer_name'    => $customerData['first_name'] . ' ' . $customerData['last_name'],
             'customer_email'   => $customerData['email'],
@@ -126,13 +136,24 @@ class OrdersService {
             'estimated_delivery' => $estimatedDate,
             'transaction_ref'  => $transactionRef,
             'payment_method'   => $paymentData['method'] ?? 'Credit Card',
+            'payment_status'   => 'Paid',
+            'order_status'     => 'Confirmed',
+            'delivery_status'  => 'Order Confirmed',
             'total_amount'     => $totalAmount,
             'items'            => $cartItems,
-            'address'          => $customerData['address'] . ', ' . $customerData['city'],
+            'city'             => $customerData['city'] ?? 'Springfield',
+            'state'            => $customerData['state'] ?? 'OR',
+            'zip'              => $customerData['zip'] ?? '97477',
+            'country'          => $customerData['country'] ?? 'United States',
+            'address'          => ($customerData['address'] ?? '') . ', ' . ($customerData['city'] ?? '') . (!empty($customerData['state']) ? ', ' . $customerData['state'] : '') . ' ' . ($customerData['zip'] ?? ''),
             'created_at'       => date('Y-m-d H:i:s')
         ];
 
         $_SESSION['last_order'] = $orderRecord;
+        if (!isset($_SESSION['session_orders']) || !is_array($_SESSION['session_orders'])) {
+            $_SESSION['session_orders'] = [];
+        }
+        $_SESSION['session_orders'][$orderNumber] = $orderRecord;
 
         // Also append to session history for demo when offline
         if (!isset($_SESSION['session_deliveries'])) $_SESSION['session_deliveries'] = [];
@@ -169,6 +190,231 @@ class OrdersService {
             'payment_status'   => 'Success',
             'card_last4'       => substr(preg_replace('/\D/', '', $paymentData['card'] ?? '4242'), -4) ?: '4242',
             'gateway_response' => 'Payment Approved via ' . ($paymentData['method'] ?? 'Credit Card') . ' Gateway',
+            'created_at'       => date('Y-m-d H:i:s')
+        ]);
+
+        return $orderRecord;
+    }
+
+    /**
+     * Create an order from a verified PayPal capture
+     * Enforces replay protection by verifying unique paypal_capture_id
+     */
+    public static function createOrderFromPayPal(
+        array $customerData,
+        array $cartItems,
+        float $totalAmount,
+        string $paypalOrderId,
+        string $paypalCaptureId,
+        ?int $userId = null
+    ): array {
+        if ($userId === null && Auth::isLoggedIn()) {
+            $user = Auth::currentUser();
+            $userId = isset($user['id']) ? (int)$user['id'] : null;
+        }
+
+        // Idempotency check: verify if an order with this capture ID already exists
+        if (DB::isConnected()) {
+            try {
+                $pdo = DB::getConnection();
+                $stmt = $pdo->prepare("
+                    SELECT o.*, d.tracking_number, d.courier_name, d.delivery_status, t.transaction_ref, t.payment_method
+                    FROM orders o
+                    LEFT JOIN product_deliveries d ON d.order_id = o.id
+                    LEFT JOIN transactions t ON t.order_id = o.id
+                    WHERE o.paypal_capture_id = ?
+                    LIMIT 1
+                ");
+                $stmt->execute([$paypalCaptureId]);
+                $existing = $stmt->fetch();
+                if ($existing) {
+                    $itemStmt = $pdo->prepare("SELECT * FROM order_items WHERE order_id = ?");
+                    $itemStmt->execute([$existing['id']]);
+                    $existing['items'] = $itemStmt->fetchAll();
+                    return $existing;
+                }
+            } catch (Exception $e) {
+                error_log("Error checking duplicate PayPal capture: " . $e->getMessage());
+            }
+        }
+
+        if (!empty($_SESSION['session_orders']) && is_array($_SESSION['session_orders'])) {
+            foreach ($_SESSION['session_orders'] as $ord) {
+                if (!empty($ord['paypal_capture_id']) && $ord['paypal_capture_id'] === $paypalCaptureId) {
+                    return $ord;
+                }
+            }
+        }
+
+        $orderNumber = 'ORD-' . date('Y') . '-' . strtoupper(substr(uniqid(), -5));
+        $trackingNumber = 'TRK-PP-' . mt_rand(100000, 999999);
+        $transactionRef = 'TXN-' . mt_rand(100000, 999999) . '-PAYPAL';
+
+        $couriers = ['FedEx Express', 'DHL Priority', 'BlueDart Express', 'UPS Worldwide'];
+        $courier = $couriers[array_rand($couriers)];
+        $estimatedDate = date('Y-m-d', strtotime('+3 days'));
+
+        $orderId = null;
+        $deliveryId = null;
+
+        if (DB::isConnected()) {
+            $pdo = DB::getConnection();
+            try {
+                $pdo->beginTransaction();
+
+                // 1. Insert or find customer
+                $stmt = $pdo->prepare("INSERT INTO customers (first_name, last_name, email, phone, address, city, zip, country)
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id");
+                $stmt->execute([
+                    $customerData['first_name'] ?? 'Guest',
+                    $customerData['last_name'] ?? 'Buyer',
+                    $customerData['email'] ?? 'buyer@example.com',
+                    $customerData['phone'] ?? null,
+                    $customerData['address'] ?? '123 Market St',
+                    $customerData['city'] ?? 'San Jose',
+                    $customerData['zip'] ?? '95131',
+                    $customerData['country'] ?? 'United States'
+                ]);
+                $customerId = $stmt->fetchColumn();
+
+                // 2. Insert order with PayPal columns
+                $custFullName = ($customerData['first_name'] ?? 'Guest') . ' ' . ($customerData['last_name'] ?? 'Buyer');
+                $stmt = $pdo->prepare("INSERT INTO orders
+                    (order_number, user_id, customer_id, customer_name, customer_email, shipping_address, city, zip, country, total_amount, payment_status, order_status, paypal_order_id, paypal_capture_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Paid', 'Confirmed', ?, ?) RETURNING id");
+                $stmt->execute([
+                    $orderNumber,
+                    $userId,
+                    $customerId,
+                    $custFullName,
+                    $customerData['email'] ?? 'buyer@example.com',
+                    $customerData['address'] ?? '123 Market St',
+                    $customerData['city'] ?? 'San Jose',
+                    $customerData['zip'] ?? '95131',
+                    $customerData['country'] ?? 'United States',
+                    $totalAmount,
+                    $paypalOrderId,
+                    $paypalCaptureId
+                ]);
+                $orderId = $stmt->fetchColumn();
+
+                // 3. Insert order items
+                $itemStmt = $pdo->prepare("INSERT INTO order_items (order_id, product_id, product_name, price, quantity, line_total)
+                                           VALUES (?, ?, ?, ?, ?, ?)");
+                foreach ($cartItems as $item) {
+                    $itemStmt->execute([
+                        $orderId,
+                        $item['id'],
+                        $item['name'],
+                        $item['price'],
+                        $item['qty'],
+                        $item['line_total']
+                    ]);
+                }
+
+                // 4. Insert delivery
+                $delivStmt = $pdo->prepare("INSERT INTO product_deliveries (order_id, tracking_number, courier_name, delivery_status, current_location, estimated_delivery, shipping_address, notes)
+                                            VALUES (?, ?, ?, 'Order Confirmed', 'Central Fulfillment Center', ?, ?, 'Paid via PayPal Sandbox. Order verified and queued for dispatch') RETURNING id");
+                $delivStmt->execute([
+                    $orderId,
+                    $trackingNumber,
+                    $courier,
+                    $estimatedDate,
+                    ($customerData['address'] ?? '') . ', ' . ($customerData['city'] ?? '') . ' ' . ($customerData['zip'] ?? '')
+                ]);
+                $deliveryId = $delivStmt->fetchColumn();
+
+                // 5. Insert timeline
+                $timeStmt = $pdo->prepare("INSERT INTO delivery_timeline (delivery_id, status, location, activity_description)
+                                           VALUES (?, 'Order Confirmed', 'Central Fulfillment Center', 'Payment verified via PayPal Sandbox and package queued for dispatch')");
+                $timeStmt->execute([$deliveryId]);
+
+                // 6. Insert transaction
+                $txnStmt = $pdo->prepare("INSERT INTO transactions (transaction_ref, order_id, amount, currency, payment_method, payment_status, card_last4, gateway_response)
+                                          VALUES (?, ?, ?, 'USD', 'PayPal', 'Success', 'N/A', ?)");
+                $txnStmt->execute([
+                    $transactionRef,
+                    $orderId,
+                    $totalAmount,
+                    'PayPal Capture ID: ' . $paypalCaptureId
+                ]);
+
+                $pdo->commit();
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                error_log("PayPal order creation failed: " . $e->getMessage());
+            }
+        }
+
+        $orderRecord = [
+            'id'               => $orderId ?: mt_rand(100, 999),
+            'order_id'         => $orderId ?: mt_rand(100, 999),
+            'user_id'          => $userId,
+            'order_number'     => $orderNumber,
+            'customer_name'    => ($customerData['first_name'] ?? 'Guest') . ' ' . ($customerData['last_name'] ?? 'Buyer'),
+            'customer_email'   => $customerData['email'] ?? 'buyer@example.com',
+            'tracking_number'  => $trackingNumber,
+            'courier_name'     => $courier,
+            'estimated_delivery' => $estimatedDate,
+            'transaction_ref'  => $transactionRef,
+            'payment_method'   => 'PayPal',
+            'payment_status'   => 'Paid',
+            'order_status'     => 'Confirmed',
+            'delivery_status'  => 'Order Confirmed',
+            'paypal_order_id'  => $paypalOrderId,
+            'paypal_capture_id'=> $paypalCaptureId,
+            'total_amount'     => $totalAmount,
+            'items'            => $cartItems,
+            'city'             => $customerData['city'] ?? 'Springfield',
+            'state'            => $customerData['state'] ?? 'OR',
+            'zip'              => $customerData['zip'] ?? '97477',
+            'country'          => $customerData['country'] ?? 'United States',
+            'address'          => ($customerData['address'] ?? '') . ', ' . ($customerData['city'] ?? '') . (!empty($customerData['state']) ? ', ' . $customerData['state'] : '') . ' ' . ($customerData['zip'] ?? ''),
+            'created_at'       => date('Y-m-d H:i:s')
+        ];
+
+        $_SESSION['last_order'] = $orderRecord;
+        if (!isset($_SESSION['session_orders']) || !is_array($_SESSION['session_orders'])) {
+            $_SESSION['session_orders'] = [];
+        }
+        $_SESSION['session_orders'][$orderNumber] = $orderRecord;
+
+        if (!isset($_SESSION['session_deliveries'])) $_SESSION['session_deliveries'] = [];
+        array_unshift($_SESSION['session_deliveries'], [
+            'id'                 => 99,
+            'order_number'       => $orderNumber,
+            'tracking_number'    => $trackingNumber,
+            'courier_name'       => $courier,
+            'delivery_status'    => 'Order Confirmed',
+            'current_location'   => 'Central Fulfillment Center',
+            'estimated_delivery' => $estimatedDate,
+            'actual_delivery'    => null,
+            'shipping_address'   => ($customerData['address'] ?? '') . ', ' . ($customerData['city'] ?? '') . ' ' . ($customerData['zip'] ?? ''),
+            'notes'              => 'Paid via PayPal Sandbox. Order verified and queued for dispatch',
+            'created_at'         => date('Y-m-d H:i:s'),
+            'timeline'           => [
+                [
+                    'status' => 'Order Confirmed',
+                    'location' => 'Central Fulfillment Center',
+                    'activity_description' => 'Payment verified via PayPal Sandbox and package queued for dispatch',
+                    'event_time' => date('Y-m-d H:i:s')
+                ]
+            ]
+        ]);
+
+        if (!isset($_SESSION['session_transactions'])) $_SESSION['session_transactions'] = [];
+        array_unshift($_SESSION['session_transactions'], [
+            'id'               => 99,
+            'transaction_ref'  => $transactionRef,
+            'order_number'     => $orderNumber,
+            'amount'           => $totalAmount,
+            'currency'         => 'USD',
+            'payment_method'   => 'PayPal',
+            'payment_status'   => 'Success',
+            'card_last4'       => 'N/A',
+            'gateway_response' => 'PayPal Capture ID: ' . $paypalCaptureId,
             'created_at'       => date('Y-m-d H:i:s')
         ]);
 
@@ -490,5 +736,414 @@ class OrdersService {
         }
 
         return $demo;
+    }
+
+    /**
+     * Get single order by order number with delivery and transaction details
+     */
+    public static function getOrderByNumber(string $orderNumber): ?array {
+        $orderNumber = trim($orderNumber);
+        if (empty($orderNumber)) return null;
+
+        if (DB::isConnected()) {
+            try {
+                $pdo = DB::getConnection();
+                $stmt = $pdo->prepare("
+                    SELECT o.*, d.tracking_number, d.courier_name, d.delivery_status, d.current_location, d.estimated_delivery, t.transaction_ref, t.payment_method
+                    FROM orders o
+                    LEFT JOIN product_deliveries d ON d.order_id = o.id
+                    LEFT JOIN transactions t ON t.order_id = o.id
+                    WHERE o.order_number = ?
+                    LIMIT 1
+                ");
+                $stmt->execute([$orderNumber]);
+                $order = $stmt->fetch();
+                if ($order) {
+                    $itemStmt = $pdo->prepare("SELECT * FROM order_items WHERE order_id = ?");
+                    $itemStmt->execute([$order['id']]);
+                    $order['items'] = $itemStmt->fetchAll();
+                    return $order;
+                }
+            } catch (Exception $e) {
+                error_log("Error fetching order by number: " . $e->getMessage());
+            }
+        }
+
+        if (!empty($_SESSION['session_orders'][$orderNumber])) {
+            return $_SESSION['session_orders'][$orderNumber];
+        }
+
+        if (!empty($_SESSION['last_order']) && ($_SESSION['last_order']['order_number'] ?? '') === $orderNumber) {
+            return $_SESSION['last_order'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Get single order by numeric ID
+     */
+    public static function getOrderById(int $orderId): ?array {
+        if ($orderId <= 0) return null;
+
+        if (DB::isConnected()) {
+            try {
+                $pdo = DB::getConnection();
+                $stmt = $pdo->prepare("
+                    SELECT o.*, d.tracking_number, d.courier_name, d.delivery_status, d.current_location, d.estimated_delivery, t.transaction_ref, t.payment_method
+                    FROM orders o
+                    LEFT JOIN product_deliveries d ON d.order_id = o.id
+                    LEFT JOIN transactions t ON t.order_id = o.id
+                    WHERE o.id = ?
+                    LIMIT 1
+                ");
+                $stmt->execute([$orderId]);
+                $order = $stmt->fetch();
+                if ($order) {
+                    $itemStmt = $pdo->prepare("SELECT * FROM order_items WHERE order_id = ?");
+                    $itemStmt->execute([$order['id']]);
+                    $order['items'] = $itemStmt->fetchAll();
+                    return $order;
+                }
+            } catch (Exception $e) {
+                error_log("Error fetching order by ID: " . $e->getMessage());
+            }
+        }
+
+        if (!empty($_SESSION['session_orders'])) {
+            foreach ($_SESSION['session_orders'] as $ord) {
+                if ((int)($ord['id'] ?? ($ord['order_id'] ?? 0)) === $orderId) {
+                    return $ord;
+                }
+            }
+        }
+
+        if (!empty($_SESSION['last_order']) && (int)($_SESSION['last_order']['order_id'] ?? 0) === $orderId) {
+            return $_SESSION['last_order'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if an order is eligible for cancellation
+     */
+    public static function isOrderEligibleForCancellation(array $order): array {
+        $orderStatus = strtolower(trim($order['order_status'] ?? ''));
+        $deliveryStatus = strtolower(trim($order['delivery_status'] ?? ''));
+
+        if ($orderStatus === 'cancelled' || $deliveryStatus === 'cancelled') {
+            return [
+                'eligible' => false,
+                'reason'   => 'This order has already been cancelled.'
+            ];
+        }
+
+        if ($orderStatus === 'completed' || $deliveryStatus === 'delivered') {
+            return [
+                'eligible' => false,
+                'reason'   => 'Delivered or completed orders cannot be cancelled online. Please initiate a return request.'
+            ];
+        }
+
+        $dispatchedStatuses = ['shipped', 'in transit', 'out for delivery', 'dispatched'];
+        if (in_array($deliveryStatus, $dispatchedStatuses, true)) {
+            return [
+                'eligible' => false,
+                'reason'   => 'This order has already been dispatched/shipped and cannot be cancelled online. Please refuse package on delivery or contact customer support.'
+            ];
+        }
+
+        // Eligible if pending or confirmed or processing
+        $eligibleOrderStatuses = ['pending', 'confirmed', 'processing', 'order confirmed'];
+        if (in_array($orderStatus, $eligibleOrderStatuses, true) || empty($orderStatus)) {
+            return [
+                'eligible' => true,
+                'reason'   => 'Order is eligible for cancellation.'
+            ];
+        }
+
+        return [
+            'eligible' => false,
+            'reason'   => 'Order status (' . ($order['order_status'] ?? 'Unknown') . ') does not permit cancellation.'
+        ];
+    }
+
+    /**
+     * Cancel an eligible order, update delivery & timeline, and refund PayPal if applicable
+     */
+    public static function cancelOrder($orderIdentifier, int $userId, string $cancelReason = '', bool $isAdmin = false): array {
+        $cancelReason = trim($cancelReason) ?: 'Customer requested cancellation';
+
+        $order = null;
+        if (is_numeric($orderIdentifier)) {
+            $order = self::getOrderById((int)$orderIdentifier);
+        }
+        if (!$order && is_string($orderIdentifier)) {
+            $order = self::getOrderByNumber($orderIdentifier);
+        }
+
+        if (!$order) {
+            return [
+                'success' => false,
+                'error'   => 'Order not found.'
+            ];
+        }
+
+        // Authorization check: User must own the order unless admin
+        if (!$isAdmin && (int)($order['user_id'] ?? 0) !== $userId) {
+            return [
+                'success' => false,
+                'error'   => 'Unauthorized: You can only cancel your own orders.'
+            ];
+        }
+
+        // Eligibility check
+        $eligibility = self::isOrderEligibleForCancellation($order);
+        if (!$eligibility['eligible']) {
+            return [
+                'success' => false,
+                'error'   => $eligibility['reason']
+            ];
+        }
+
+        $orderNumber = $order['order_number'];
+        $orderId = $order['id'] ?? ($order['order_id'] ?? null);
+        $totalAmount = (float)($order['total_amount'] ?? 0);
+        $isPaid = (strtolower($order['payment_status'] ?? '') === 'paid');
+        $hasPayPalCapture = !empty($order['paypal_capture_id']);
+
+        $refundId = null;
+        $refundStatus = null;
+        $refundedAmount = 0.0;
+        $newPaymentStatus = 'Cancelled';
+
+        // Process refund if paid
+        if ($isPaid) {
+            if ($hasPayPalCapture) {
+                try {
+                    $refundRes = PayPalService::refundCapture(
+                        $order['paypal_capture_id'],
+                        $totalAmount,
+                        'Order ' . $orderNumber . ' cancelled: ' . $cancelReason
+                    );
+                    $refundId = $refundRes['refund_id'] ?? ('REF-PP-' . mt_rand(100000, 999999));
+                    $refundStatus = $refundRes['status'] ?? 'COMPLETED';
+                    $refundedAmount = $totalAmount;
+                    $newPaymentStatus = 'Refunded';
+                } catch (Exception $e) {
+                    error_log("PayPal refund failed during cancellation: " . $e->getMessage());
+                    return [
+                        'success' => false,
+                        'error'   => 'Payment refund via PayPal failed: ' . $e->getMessage() . '. Order was not cancelled.'
+                    ];
+                }
+            } else {
+                // Card / other payment simulation
+                $refundId = 'REF-GEN-' . mt_rand(100000, 999999);
+                $refundStatus = 'COMPLETED';
+                $refundedAmount = $totalAmount;
+                $newPaymentStatus = 'Refunded';
+            }
+        }
+
+        $cancelledAt = date('Y-m-d H:i:s');
+
+        // Update database if connected
+        if (DB::isConnected() && $orderId) {
+            $pdo = DB::getConnection();
+            try {
+                $pdo->beginTransaction();
+
+                // 1. Update order
+                $stmt = $pdo->prepare("
+                    UPDATE orders
+                    SET order_status = 'Cancelled',
+                        payment_status = ?,
+                        cancelled_at = ?,
+                        cancel_reason = ?,
+                        refund_id = ?,
+                        refund_status = ?,
+                        refunded_amount = ?
+                    WHERE id = ?
+                ");
+                $stmt->execute([
+                    $newPaymentStatus,
+                    $cancelledAt,
+                    $cancelReason,
+                    $refundId,
+                    $refundStatus,
+                    $refundedAmount,
+                    $orderId
+                ]);
+
+                // 2. Update delivery
+                $stmt = $pdo->prepare("
+                    UPDATE product_deliveries
+                    SET delivery_status = 'Cancelled',
+                        notes = ?
+                    WHERE order_id = ?
+                    RETURNING id
+                ");
+                $stmt->execute(['Order cancelled by customer. Reason: ' . $cancelReason, $orderId]);
+                $delivId = $stmt->fetchColumn();
+
+                // 3. Insert timeline entry
+                if ($delivId) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO delivery_timeline (delivery_id, status, location, activity_description, event_time)
+                        VALUES (?, 'Cancelled', 'Fulfillment Center', ?, ?)
+                    ");
+                    $stmt->execute([
+                        $delivId,
+                        'Order cancelled by customer. Reason: ' . $cancelReason,
+                        $cancelledAt
+                    ]);
+                }
+
+                // 4. Insert refund transaction if refunded
+                if ($refundId) {
+                    $txnRef = 'TXN-' . mt_rand(100000, 999999) . '-REFUND';
+                    $stmt = $pdo->prepare("
+                        INSERT INTO transactions (transaction_ref, order_id, amount, currency, payment_method, payment_status, card_last4, gateway_response, created_at)
+                        VALUES (?, ?, ?, 'USD', ?, 'Refunded', 'N/A', ?, ?)
+                    ");
+                    $stmt->execute([
+                        $txnRef,
+                        $orderId,
+                        $refundedAmount,
+                        $order['payment_method'] ?? 'PayPal',
+                        'Refund issued: ' . $refundId . ' (' . $cancelReason . ')',
+                        $cancelledAt
+                    ]);
+                }
+
+                $pdo->commit();
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                error_log("DB update on cancellation failed: " . $e->getMessage());
+            }
+        }
+
+        // Update session storage
+        if (isset($_SESSION['session_orders'][$orderNumber])) {
+            $_SESSION['session_orders'][$orderNumber]['order_status'] = 'Cancelled';
+            $_SESSION['session_orders'][$orderNumber]['delivery_status'] = 'Cancelled';
+            $_SESSION['session_orders'][$orderNumber]['payment_status'] = $newPaymentStatus;
+            $_SESSION['session_orders'][$orderNumber]['cancelled_at'] = $cancelledAt;
+            $_SESSION['session_orders'][$orderNumber]['cancel_reason'] = $cancelReason;
+            $_SESSION['session_orders'][$orderNumber]['refund_id'] = $refundId;
+            $_SESSION['session_orders'][$orderNumber]['refund_status'] = $refundStatus;
+            $_SESSION['session_orders'][$orderNumber]['refunded_amount'] = $refundedAmount;
+        }
+
+        if (isset($_SESSION['last_order']) && ($_SESSION['last_order']['order_number'] ?? '') === $orderNumber) {
+            $_SESSION['last_order']['order_status'] = 'Cancelled';
+            $_SESSION['last_order']['delivery_status'] = 'Cancelled';
+            $_SESSION['last_order']['payment_status'] = $newPaymentStatus;
+            $_SESSION['last_order']['cancelled_at'] = $cancelledAt;
+            $_SESSION['last_order']['cancel_reason'] = $cancelReason;
+            $_SESSION['last_order']['refund_id'] = $refundId;
+            $_SESSION['last_order']['refund_status'] = $refundStatus;
+            $_SESSION['last_order']['refunded_amount'] = $refundedAmount;
+        }
+
+        if (!empty($_SESSION['session_deliveries'])) {
+            foreach ($_SESSION['session_deliveries'] as &$del) {
+                if (($del['order_number'] ?? '') === $orderNumber) {
+                    $del['delivery_status'] = 'Cancelled';
+                    $del['notes'] = 'Order cancelled by customer: ' . $cancelReason;
+                    if (!isset($del['timeline'])) $del['timeline'] = [];
+                    array_unshift($del['timeline'], [
+                        'status' => 'Cancelled',
+                        'location' => 'Fulfillment Center',
+                        'activity_description' => 'Order cancelled by customer. Reason: ' . $cancelReason,
+                        'event_time' => $cancelledAt
+                    ]);
+                }
+            }
+        }
+
+        if ($refundId) {
+            if (!isset($_SESSION['session_transactions'])) $_SESSION['session_transactions'] = [];
+            array_unshift($_SESSION['session_transactions'], [
+                'id'               => 999,
+                'transaction_ref'  => 'TXN-' . mt_rand(100000, 999999) . '-REFUND',
+                'order_number'     => $orderNumber,
+                'amount'           => $refundedAmount,
+                'currency'         => 'USD',
+                'payment_method'   => $order['payment_method'] ?? 'PayPal',
+                'payment_status'   => 'Refunded',
+                'card_last4'       => 'N/A',
+                'gateway_response' => 'Refund processed: ' . $refundId . ' (' . $cancelReason . ')',
+                'created_at'       => $cancelledAt
+            ]);
+        }
+
+        return [
+            'success'         => true,
+            'message'         => 'Order ' . $orderNumber . ' was successfully cancelled' . ($refundId ? " and $" . number_format($totalAmount, 2) . " was refunded via " . ($order['payment_method'] ?? 'payment method') . '.' : '.'),
+            'order_number'    => $orderNumber,
+            'refund_id'       => $refundId,
+            'refunded_amount' => $refundedAmount,
+            'refund_status'   => $refundStatus
+        ];
+    }
+
+    /**
+     * Get orders specifically belonging to a given user ID
+     */
+    public static function getUserOrders(int $userId): array {
+        $orders = [];
+        $orderNumbers = [];
+
+        if (DB::isConnected()) {
+            try {
+                $pdo = DB::getConnection();
+                $stmt = $pdo->prepare("
+                    SELECT o.*, d.tracking_number, d.courier_name, d.delivery_status, t.transaction_ref, t.payment_method
+                    FROM orders o
+                    LEFT JOIN product_deliveries d ON d.order_id = o.id
+                    LEFT JOIN transactions t ON t.order_id = o.id
+                    WHERE o.user_id = ?
+                    ORDER BY o.id DESC
+                ");
+                $stmt->execute([$userId]);
+                $dbOrders = $stmt->fetchAll();
+
+                foreach ($dbOrders as $ord) {
+                    $itemStmt = $pdo->prepare("SELECT * FROM order_items WHERE order_id = ?");
+                    $itemStmt->execute([$ord['id']]);
+                    $ord['items'] = $itemStmt->fetchAll();
+                    $orders[] = $ord;
+                    $orderNumbers[] = $ord['order_number'];
+                }
+            } catch (Exception $e) {
+                error_log("Error fetching user orders: " . $e->getMessage());
+            }
+        }
+
+        // Merge session orders
+        if (!empty($_SESSION['session_orders']) && is_array($_SESSION['session_orders'])) {
+            foreach (array_reverse($_SESSION['session_orders']) as $sessOrd) {
+                if ((int)($sessOrd['user_id'] ?? 0) === $userId) {
+                    if (!in_array($sessOrd['order_number'], $orderNumbers, true)) {
+                        $orders[] = $sessOrd;
+                        $orderNumbers[] = $sessOrd['order_number'];
+                    }
+                }
+            }
+        }
+
+        // Fallback: check session last order
+        if (!empty($_SESSION['last_order']) && (int)($_SESSION['last_order']['user_id'] ?? 0) === $userId) {
+            if (!in_array($_SESSION['last_order']['order_number'], $orderNumbers, true)) {
+                $orders[] = $_SESSION['last_order'];
+            }
+        }
+
+        return $orders;
     }
 }

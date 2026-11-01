@@ -1,6 +1,6 @@
 <?php
-session_start();
-require_once 'products.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/products.php';
 
 if (!isset($_SESSION['cart'])) {
     $_SESSION['cart'] = [];

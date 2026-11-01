@@ -1,8 +1,7 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
 
 // Calculate cart count
 $cart_count = 0;
@@ -12,6 +11,8 @@ if (!empty($_SESSION['cart'])) {
     }
 }
 $currentPage = basename($_SERVER['PHP_SELF'] ?? '');
+$isUserLoggedIn = Auth::isLoggedIn();
+$currentUser = Auth::currentUser();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -47,6 +48,26 @@ $currentPage = basename($_SERVER['PHP_SELF'] ?? '');
                     <span class="cart-count"><?php echo $cart_count; ?></span>
                 <?php endif; ?>
             </a>
+
+            <div class="nav-divider"></div>
+
+            <?php if ($isUserLoggedIn && $currentUser): ?>
+                <a href="account.php" class="nav-user-pill <?php echo $currentPage === 'account.php' ? 'active' : ''; ?>" title="View Account Dashboard">
+                    <span class="user-avatar-mini">👤</span>
+                    <span class="user-greeting"><?php echo htmlspecialchars(explode(' ', trim($currentUser['full_name']))[0]); ?></span>
+                </a>
+                <form action="logout.php" method="POST" class="nav-logout-form">
+                    <?php echo Auth::csrfField(); ?>
+                    <button type="submit" class="nav-logout-btn" title="Sign Out">Sign Out</button>
+                </form>
+            <?php else: ?>
+                <a href="login.php" class="nav-auth-link <?php echo $currentPage === 'login.php' ? 'active' : ''; ?>">
+                    Sign In
+                </a>
+                <a href="signup.php" class="btn btn-primary btn-sm nav-signup-btn <?php echo $currentPage === 'signup.php' ? 'active' : ''; ?>">
+                    Sign Up
+                </a>
+            <?php endif; ?>
         </nav>
     </div>
 </header>

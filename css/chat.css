@@ -1,0 +1,753 @@
+/* ========================================================
+   Nexora AI Assistant - Floating Chat Widget Styling
+   Engineered for zero-overflow, responsive multi-device support,
+   natural text wrapping, and production-grade UX.
+   ======================================================== */
+
+/* Root Chat Box Sizing Enforcement */
+.nexora-chat-window,
+.nexora-chat-window *,
+.nexora-chat-window *::before,
+.nexora-chat-window *::after,
+.nexora-chat-toggle,
+.nexora-chat-toggle * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ========================================================
+   1. Floating Chat Toggle Button
+   ======================================================== */
+.nexora-chat-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.38), 0 2px 6px rgba(0, 0, 0, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                box-shadow 0.25s ease,
+                background 0.25s ease;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.nexora-chat-toggle:hover {
+    transform: scale(1.08) translateY(-2px);
+    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.48), 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.nexora-chat-toggle:active {
+    transform: scale(0.95);
+}
+
+.nexora-chat-toggle .icon-chat,
+.nexora-chat-toggle .icon-close {
+    font-size: 24px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.nexora-chat-toggle .icon-close {
+    display: none;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.nexora-chat-toggle.is-open .icon-chat {
+    display: none;
+}
+
+.nexora-chat-toggle.is-open .icon-close {
+    display: flex;
+}
+
+/* Unread Notification Badge */
+.chat-toggle-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: #10b981;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================================
+   2. Floating Chat Window Modal
+   ======================================================== */
+.nexora-chat-window {
+    position: fixed;
+    bottom: 92px;
+    right: 20px;
+    width: 400px;
+    max-width: calc(100vw - 32px);
+    height: 600px;
+    max-height: calc(100vh - 110px);
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 16px 40px -6px rgba(15, 23, 42, 0.28), 
+                0 0 0 1px rgba(15, 23, 42, 0.08);
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    overflow-x: hidden;
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(16px) scale(0.97);
+    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1), 
+                transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), 
+                visibility 0.24s ease;
+}
+
+.nexora-chat-window.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+}
+
+/* ========================================================
+   3. Chat Header
+   ======================================================== */
+.chat-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #ffffff;
+    padding: 0.85rem 1.15rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    min-width: 0;
+    width: 100%;
+}
+
+.chat-header-profile {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.chat-avatar-wrapper {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35);
+    flex-shrink: 0;
+}
+
+.online-dot {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 9px;
+    height: 9px;
+    background: #10b981;
+    border: 2px solid #0f172a;
+    border-radius: 50%;
+}
+
+.chat-header-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.chat-header-info h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.2;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-header-subtitle {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    line-height: 1.2;
+    margin-top: 2px;
+}
+
+.chat-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.chat-btn-icon {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #cbd5e1;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    line-height: 1;
+}
+
+.chat-btn-icon:hover {
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+    transform: scale(1.05);
+}
+
+.chat-btn-icon:active {
+    transform: scale(0.95);
+}
+
+/* ========================================================
+   4. Chat Messages Body (Zero Horizontal Overflow)
+   ======================================================== */
+.chat-messages {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    background: #f8fafc;
+    scroll-behavior: smooth;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    overscroll-behavior: contain;
+}
+
+/* Custom Clean Scrollbar */
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ========================================================
+   5. Message Rows & Bubbles
+   ======================================================== */
+.chat-msg-row {
+    display: flex;
+    gap: 0.6rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.chat-msg-row.bot {
+    align-self: flex-start;
+    justify-content: flex-start;
+}
+
+.chat-msg-row.user {
+    align-self: flex-end;
+    justify-content: flex-end;
+    flex-direction: row-reverse;
+}
+
+.chat-msg-avatar {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.chat-bubble {
+    padding: 0.75rem 0.95rem;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    word-wrap: break-word;
+    min-width: 0;
+    max-width: 86%;
+    box-sizing: border-box;
+}
+
+.chat-msg-row.bot .chat-bubble {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px 16px 16px 4px;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+/* When bot row contains product recommendations, expand bubble width smoothly */
+.chat-msg-row.bot.has-products .chat-bubble {
+    max-width: calc(100% - 36px);
+    width: 100%;
+}
+
+.chat-msg-row.user .chat-bubble {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #ffffff;
+    border-radius: 16px 16px 4px 16px;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+/* Typography & Formatting inside Bubbles */
+.chat-bubble strong {
+    font-weight: 700;
+}
+
+.chat-bubble p {
+    margin: 0.3rem 0;
+}
+
+.chat-bubble p:first-child {
+    margin-top: 0;
+}
+
+.chat-bubble p:last-child {
+    margin-bottom: 0;
+}
+
+.chat-bubble ul,
+.chat-bubble ol {
+    margin: 0.35rem 0 0.35rem 1rem;
+    padding-left: 0.25rem;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.chat-bubble li {
+    margin-bottom: 0.3rem;
+    line-height: 1.45;
+}
+
+.chat-bubble li:last-child {
+    margin-bottom: 0;
+}
+
+.chat-bubble code {
+    background: #f1f5f9;
+    color: #2563eb;
+    padding: 0.15rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+}
+
+.chat-msg-row.user .chat-bubble code {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+.chat-bubble pre {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 0.6rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    margin: 0.4rem 0;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* ========================================================
+   6. Quick Suggestion Chips
+   ======================================================== */
+.chat-quick-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.65rem;
+    width: 100%;
+    max-width: 100%;
+}
+
+.quick-chip {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: normal;
+    word-break: break-word;
+    text-align: left;
+    line-height: 1.3;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.quick-chip:hover {
+    background: #eff6ff;
+    border-color: #2563eb;
+    color: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(37, 99, 235, 0.12);
+}
+
+.quick-chip:active {
+    transform: translateY(0);
+}
+
+/* ========================================================
+   7. Product Recommendation Cards (Fully Responsive & Multi-Line)
+   ======================================================== */
+.chat-products-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-top: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.chat-product-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.65rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04);
+}
+
+.chat-product-card:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.1);
+    transform: translateY(-1px);
+}
+
+.chat-prod-thumb {
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    max-width: 52px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    display: block;
+}
+
+.chat-prod-details {
+    flex: 1 1 0%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    overflow: hidden;
+}
+
+.chat-prod-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.3;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-prod-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.75rem;
+    flex-wrap: wrap;
+    line-height: 1.2;
+}
+
+.chat-prod-price {
+    font-weight: 800;
+    color: #2563eb;
+    white-space: nowrap;
+}
+
+.chat-prod-rating {
+    color: #d97706;
+    font-size: 0.74rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.chat-btn-add {
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    flex-shrink: 0;
+    align-self: center;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+}
+
+.chat-btn-add:hover {
+    background: #1d4ed8;
+    transform: scale(1.04);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+.chat-btn-add:active {
+    transform: scale(0.96);
+}
+
+.chat-btn-add.added {
+    background: #10b981;
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(16, 185, 129, 0.25);
+    cursor: default;
+}
+
+/* ========================================================
+   8. Typing Indicator
+   ======================================================== */
+.chat-typing-dots {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0.75rem 1rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px 16px 16px 4px;
+    width: fit-content;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.chat-dot {
+    width: 7px;
+    height: 7px;
+    background: #94a3b8;
+    border-radius: 50%;
+    animation: chatBounce 1.4s infinite ease-in-out both;
+}
+
+.chat-dot:nth-child(1) { animation-delay: -0.32s; }
+.chat-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes chatBounce {
+    0%, 80%, 100% { transform: scale(0); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+}
+
+/* ========================================================
+   9. Chat Input Footer (Strict Non-Overlapping Layout)
+   ======================================================== */
+.chat-footer {
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+    flex-shrink: 0;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.chat-input-form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 24px;
+    padding: 0.25rem 0.35rem 0.25rem 0.95rem;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.chat-input-form:focus-within {
+    border-color: #2563eb;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.chat-input {
+    flex: 1 1 0%;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    font-size: 0.88rem;
+    font-family: inherit;
+    color: #0f172a;
+    outline: none;
+    padding: 0.4rem 0;
+}
+
+.chat-input::placeholder {
+    color: #94a3b8;
+}
+
+.chat-btn-send {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    transition: background 0.15s ease, transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.chat-btn-send:hover {
+    background: #1d4ed8;
+    transform: scale(1.05);
+}
+
+.chat-btn-send:active {
+    transform: scale(0.95);
+}
+
+.chat-btn-send:disabled {
+    background: #cbd5e1;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.chat-disclaimer {
+    text-align: center;
+    font-size: 0.68rem;
+    color: #94a3b8;
+    margin-top: 0.45rem;
+    line-height: 1.2;
+}
+
+/* ========================================================
+   10. Responsive Behavior & Mobile Safe Areas
+   ======================================================== */
+@media (max-width: 540px) {
+    .nexora-chat-window {
+        bottom: 0;
+        right: 0;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-width: 100vw;
+        height: 100%;
+        max-height: 100dvh;
+        max-height: -webkit-fill-available;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+    }
+
+    .nexora-chat-window.is-open {
+        transform: translateY(0);
+    }
+
+    .nexora-chat-toggle {
+        bottom: 16px;
+        right: 16px;
+        width: 54px;
+        height: 54px;
+    }
+
+    .chat-header {
+        padding: calc(0.75rem + env(safe-area-inset-top, 0px)) 1rem 0.75rem 1rem;
+    }
+
+    .chat-footer {
+        padding: 0.65rem 1rem calc(0.65rem + env(safe-area-inset-bottom, 0px)) 1rem;
+    }
+
+    .chat-bubble {
+        max-width: 88%;
+    }
+
+    .chat-msg-row.bot.has-products .chat-bubble {
+        max-width: calc(100% - 34px);
+    }
+}

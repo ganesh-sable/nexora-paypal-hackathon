@@ -1,6 +1,6 @@
 # Nexora – Modern E-Commerce Platform
 
-A modern, responsive e-commerce application built with **PHP 8+** and **PostgreSQL**. Features a product catalog across **20 categories (240+ products)**, real-time **Product Delivery Tracking**, **Transaction History**, and interactive database diagnostics.
+A modern, responsive e-commerce application built with **PHP 8+** and **PostgreSQL**. Features a product catalog across **20 categories (240+ products)**, real-time **Product Delivery Tracking**, **Transaction History**, **User Authentication**, **AI Shopping Assistant**, and official **PayPal Sandbox Checkout** with instant order cancellation refunds.
 
 ---
 
@@ -32,7 +32,7 @@ A modern, responsive e-commerce application built with **PHP 8+** and **PostgreS
    - `categories`: Category names, slugs, emojis, and descriptions.
    - `products`: Product details, categories, prices, badges, ratings, reviews, and stock.
    - `customers`: Customer profiles and shipping addresses.
-   - `orders`: Order headers, totals, statuses, and customer references.
+   - `orders`: Order headers, totals, statuses, customer references, and PayPal tracking IDs.
    - `order_items`: Line items, prices, and quantities per order.
    - `product_deliveries`: Carrier information (FedEx, DHL, BlueDart, UPS), tracking numbers (`TRK-...`), delivery statuses, and estimated delivery dates.
    - `delivery_timeline`: Step-by-step transit tracking checkpoints and locations.
@@ -45,10 +45,16 @@ A modern, responsive e-commerce application built with **PHP 8+** and **PostgreS
 
 4. **Product Transaction History (`transactions.php`)**:
    - Financial KPI cards: Total processed volume, successful payments count, pending count, and average order value.
-   - Search and filter by status (*Success*, *Pending*, *Failed*) and payment method.
+   - Search and filter by status (*Success*, *Pending*, *Failed*, *Refunded*) and payment method.
 
-5. **Seamless Standalone & Hybrid Fallback**:
-   - If PostgreSQL is still launching or offline, ShopDemo runs safely in catalog fallback mode without breaking. Once PostgreSQL is connected, all records are stored directly into PostgreSQL.
+5. **User Authentication & Security**:
+   - Secure Registration and Login with password strength enforcement (12+ characters, upper, lower, numbers, symbols).
+   - Session fixation protection, CSRF token verification, and brute-force lockout throttling.
+
+6. **Official PayPal Sandbox Checkout & Order Cancellation**:
+   - Official PayPal Smart Buttons SDK with backend order creation and payment capture.
+   - Zero hardcoded secrets; Client Secret strictly backend-isolated.
+   - Instant order cancellation with automated PayPal REST API refund.
 
 ---
 
@@ -82,6 +88,8 @@ Then visit **http://localhost:8000/database_setup.php** and click **"Initialize 
    ```bash
    psql -U postgres -d ecommerce_db -f database/schema.sql
    psql -U postgres -d ecommerce_db -f database/seeds.sql
+   psql -U postgres -d ecommerce_db -f database/migrations/001_create_auth_tables.sql
+   psql -U postgres -d ecommerce_db -f database/migrations/002_add_paypal_and_cancellation.sql
    ```
 
 ---
@@ -101,6 +109,61 @@ Open your browser and navigate to:
 - **Transaction History**: [http://localhost:8000/transactions.php](http://localhost:8000/transactions.php)
 - **Database Management**: [http://localhost:8000/database_setup.php](http://localhost:8000/database_setup.php)
 - **Shopping Cart**: [http://localhost:8000/cart.php](http://localhost:8000/cart.php)
+- **My Account**: [http://localhost:8000/account.php](http://localhost:8000/account.php)
+
+---
+
+## 🤖 Nexora AI Assistant (Chatbot)
+
+Nexora features a floating AI shopping assistant with native Function Calling tools and PostgreSQL integration. The widget appears automatically on every page at the bottom-right corner.
+
+### Dual Capabilities
+
+1. **AI Advisor (General Shopping & Gift Intelligence):**
+   - Answers product queries, comparisons, and buying tips (e.g. *"Which laptop is best for coding and gaming?"*, *"Which cookware should I buy?"*).
+   - Handles gift recommendations by asking follow-up questions (occasion, recipient interests, budget) and recommending store products.
+2. **AI Store Assistant (Function Calling / Database Tools):**
+   - 🔍 `search_products(keyword, category, max_price)`: Real-time parameterized search across 240+ products.
+   - 🚚 `track_order(tracking_number_or_order_number)`: Queries live delivery status and courier timeline checkpoints.
+   - 💳 `get_transactions(order_number_or_transaction_id)`: Checks payment gateway records and receipt status.
+   - 🛒 `add_to_cart(product_id, quantity)`: Directly adds recommended products to the cart with dynamic badge updates.
+   - 🛡️ **Store Policy & PayPal Support**: Instant answers for PayPal Express Checkout, 30-day money-back guarantee, and payment options.
+
+### Setup Instructions
+
+Nexora AI Assistant uses **OpenRouter** with **Automatic Model Selection** (`auto`) as the primary LLM provider, and features an integrated offline-resilient intent detection and typo correction engine (`chatbot_intent.php`):
+
+#### OpenRouter Configuration (Recommended)
+1. Obtain an API key from [OpenRouter](https://openrouter.ai/keys) (starts with `sk-or-...`).
+2. Add the configuration to your `.env` file:
+   ```env
+   OPENROUTER_API_KEY=your_openrouter_api_key_here
+   OPENROUTER_MODEL=auto
+   LLM_PROVIDER=openrouter
+   ```
+
+#### Offline / Fallback Resiliency
+Even without an active internet connection or API credits, the built-in **Intelligent Intent & Typo Correction Engine** (`chatbot_intent.php`) guarantees:
+- **Deterministic Typo Correction:** e.g., *"lptop"* ➔ *"laptop"*, *"wtch"* ➔ *"watch"*, *"samsng"* ➔ *"Samsung"*, *"headfones"* ➔ *"headphones"*.
+- **Category Isolation:** Requesting a laptop only returns laptops (no mice, keyboards, or monitors); requesting a watch only returns watches.
+- **Natural Budget & Multi-Turn Context:** Handles *"under 40000"*, *"laptop under 40000"*, and retains previous turn context during multi-turn shopping chats.
+- **Accurate Out-of-Catalog Handling:** Queries for non-existent categories return zero products with a courteous explanatory message.
+
+---
+
+## 🅿️ PayPal Sandbox Integration & Order Cancellation
+
+Nexora integrates the official **PayPal Checkout v2 REST API** with backend order capture and instant cancellation refunds:
+
+1. Obtain your sandbox credentials from [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/applications/sandbox).
+2. Add your credentials to `.env`:
+   ```env
+   PAYPAL_CLIENT_ID=your_paypal_sandbox_client_id_here
+   PAYPAL_CLIENT_SECRET=your_paypal_sandbox_client_secret_here
+   PAYPAL_ENVIRONMENT=sandbox
+   ```
+3. Test using a **Personal (Buyer) Sandbox Account** from PayPal's Testing Tools dashboard.
+4. Eligible placed orders can be cancelled with one click from `account.php` or `track_delivery.php`, triggering automatic REST API refunds for captured payments.
 
 ---
 
@@ -108,23 +171,43 @@ Open your browser and navigate to:
 
 ```
 ecommerce-demo/
+├── chat_api.php          → AI chat endpoint with function calling & tools
+├── chat_widget.php       → Floating chatbot widget (HTML + Vanilla JS, zero dependencies)
+├── chatbot_intent.php    → Intent detection, typo correction, fuzzy matching & SQL query engine
+├── css/
+│   ├── chat.css          → Chat window, bubbles, product cards & typing animation
+│   └── style.css         → Complete modern styling
+├── auth.php              → Core authentication, password hashing, CSRF & rate limiting
+├── signup.php            → Secure registration with live 12+ char password meter
+├── login.php             → User authentication with brute-force lockout & remember me
+├── logout.php            → POST-only CSRF-verified session destruction
+├── account.php           → Customer dashboard with profile, orders & shipment links
+├── forgot_password.php   → Password reset request with enumeration protection
+├── reset_password.php    → Secure token validation & new password creation
+├── paypal_api.php        → Secure AJAX endpoint for PayPal Smart Buttons
+├── paypal_service.php    → PayPal REST API v2 client (OAuth, orders, captures, refunds)
+├── cancel_order.php      → CSRF-protected order cancellation & refund handler
 ├── index.php             → Products catalog with 20 categories & live filters
 ├── track_delivery.php    → Shipment tracker with visual stepper & transit checkpoints
 ├── transactions.php      → Product transaction history & financial KPI metrics
-├── checkout.php          → Checkout with order, delivery, and payment persistence
+├── checkout.php          → Checkout with PayPal Smart Buttons & shipping form
 ├── cart.php              → Shopping cart with quantity controls
 ├── cart_action.php       → Cart add/remove/adjust actions
 ├── database_setup.php    → Web-based PostgreSQL installer and live status panel
-├── config.php            → Database and application configurations
+├── config.php            → Database, LLM and application configurations
 ├── db.php                → PDO PostgreSQL database connection and query helpers
 ├── orders_service.php    → Service layer for orders, deliveries & transactions
 ├── products.php          → Product repository with dynamic DB query & fallback
 ├── products_data.php     → Master catalog data (20 categories, 240 products)
-├── header.php            → Header with real-time PostgreSQL status dot
-├── footer.php            → Modern footer with catalog and database stats
-├── css/
-│   └── style.css         → Complete modern styling
+├── header.php            → Header with navigation, cart badge & user profile
+├── footer.php            → Footer with navigation and embedded AI chatbot widget
+├── tests/
+│   ├── auth_test.php              → Automated test suite verifying 16 security & auth criteria
+│   ├── chatbot_test.php           → Automated test suite verifying all chatbot capabilities
+│   ├── test_paypal_and_cancel.php → Automated test suite verifying Scenarios A through L
+│   └── test_recommendations.php   → Automated test suite verifying 14 multi-turn scenarios
 └── database/
+    ├── migrations/       → SQL migrations (auth tables, remember tokens, orders.paypal_*)
     ├── schema.sql        → PostgreSQL DDL (tables, indexes, foreign keys)
     ├── seeds.sql         → Pre-seeded data (240 products, deliveries, transactions)
     └── setup.php         → Automated installer script
