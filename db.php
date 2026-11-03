@@ -29,19 +29,32 @@ class DB {
             return null;
         }
 
+        $sslMode = defined('DB_SSLMODE') ? DB_SSLMODE : '';
+        if (empty($sslMode) && (str_contains(DB_HOST, 'neon.tech') || str_contains(DB_HOST, 'render.com') || str_contains(DB_HOST, 'supabase.co'))) {
+            $sslMode = 'require';
+        }
+
         $dsn = sprintf("pgsql:host=%s;port=%s;dbname=%s", DB_HOST, DB_PORT, DB_NAME);
+        if (!empty($sslMode)) {
+            $dsn .= ";sslmode=" . $sslMode;
+        }
 
         try {
+            // Neon and cloud databases may have slight cold start latency, so 10s timeout is safer
             self::$instance = new PDO($dsn, DB_USER, DB_PASS, [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
-                PDO::ATTR_TIMEOUT            => 3
+                PDO::ATTR_TIMEOUT            => 10
             ]);
             self::$errorMessage = null;
             return self::$instance;
         } catch (PDOException $e) {
-            self::$errorMessage = $e->getMessage();
+            // Sanitize sensitive credentials if any appear in error output
+            $rawMsg = $e->getMessage();
+            $sanitizedMsg = preg_replace('/(password|pass|pwd)=([^\s;]+)/i', '$1=****', $rawMsg);
+            $sanitizedMsg = preg_replace('/:\/\/([^:]+):([^@]+)@/i', '://$1:****@', $sanitizedMsg);
+            self::$errorMessage = $sanitizedMsg;
             self::$instance = null;
             return null;
         }

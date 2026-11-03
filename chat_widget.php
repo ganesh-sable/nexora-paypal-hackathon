@@ -58,7 +58,7 @@
             <input type="text" id="chatInput" class="chat-input" placeholder="Ask about products, orders, gifts..." autocomplete="off" maxlength="500">
             <button type="submit" id="chatBtnSend" class="chat-btn-send" title="Send message">➤</button>
         </form>
-        <div class="chat-disclaimer">Nexora AI • Powered by OpenRouter & PostgreSQL</div>
+        <div class="chat-disclaimer">NEXORA AI</div>
     </div>
 </div>
 

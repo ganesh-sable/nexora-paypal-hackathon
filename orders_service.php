@@ -32,6 +32,10 @@ class OrdersService {
         $deliveryId = null;
         $transactionId = null;
 
+        if (defined('APP_ENV') && APP_ENV === 'production' && !DB::isConnected()) {
+            throw new RuntimeException("Database connection is required to place orders in production mode.");
+        }
+
         if (DB::isConnected()) {
             $pdo = DB::getConnection();
             try {
@@ -120,6 +124,9 @@ class OrdersService {
                     $pdo->rollBack();
                 }
                 error_log("Order creation failed: " . $e->getMessage());
+                if (defined('APP_ENV') && APP_ENV === 'production') {
+                    throw new RuntimeException("Database error saving order: " . $e->getMessage());
+                }
             }
         }
 
@@ -257,6 +264,10 @@ class OrdersService {
         $orderId = null;
         $deliveryId = null;
 
+        if (defined('APP_ENV') && APP_ENV === 'production' && !DB::isConnected()) {
+            throw new RuntimeException("Database connection is required to process PayPal orders in production mode.");
+        }
+
         if (DB::isConnected()) {
             $pdo = DB::getConnection();
             try {
@@ -345,6 +356,9 @@ class OrdersService {
                     $pdo->rollBack();
                 }
                 error_log("PayPal order creation failed: " . $e->getMessage());
+                if (defined('APP_ENV') && APP_ENV === 'production') {
+                    throw new RuntimeException("Database error saving PayPal order: " . $e->getMessage());
+                }
             }
         }
 

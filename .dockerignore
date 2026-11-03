@@ -1,0 +1,28 @@
+# Git repository
+.git/
+.gitignore
+
+# Local environment configuration & secrets
+.env
+.env.*
+!.env.example
+
+# Test suites & logs
+tests/
+*.log
+
+# IDE & Editor metadata
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+.DS_Store
+Thumbs.db
+
+# Antigravity & Agent workspace artifacts
+.system_generated/
+.user_uploaded/
+scratch/
+
+# Docker & local compose configurations (not needed inside container)
+docker-compose.yml

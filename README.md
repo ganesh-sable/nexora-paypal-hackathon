@@ -1,214 +1,257 @@
-# Nexora – Modern E-Commerce Platform
+# Nexora AI E-Commerce Platform
 
-A modern, responsive e-commerce application built with **PHP 8+** and **PostgreSQL**. Features a product catalog across **20 categories (240+ products)**, real-time **Product Delivery Tracking**, **Transaction History**, **User Authentication**, **AI Shopping Assistant**, and official **PayPal Sandbox Checkout** with instant order cancellation refunds.
+A production-ready, intelligent e-commerce platform built with **PHP 8+** and **PostgreSQL**. Features a product catalog across **20 categories (240+ products)**, an **AI Shopping Assistant** powered by OpenRouter, official **PayPal Sandbox Checkout** with automated refund cancellation, real-time **Product Delivery Tracking**, and **Transaction History**.
 
----
-
-## 🌟 Key Features
-
-1. **20 Product Categories & 240+ Items** (12 products each):
-   - 📱 Electronics (Smartphones, tablets, power banks, chargers)
-   - 💻 Computers & Laptops (Laptops, desktops, monitors, keyboards, mice)
-   - 👕 Fashion & Clothing (T-shirts, shirts, jeans, dresses, jackets)
-   - 👟 Footwear (Sneakers, boots, loafers, sandals, slippers)
-   - ⌚ Watches & Accessories (Smartwatches, analog watches, belts, wallets)
-   - 💄 Beauty & Personal Care (Makeup, skincare, perfumes, hair dryers)
-   - 🏠 Home & Kitchen (Cookware, appliances, bedsheets, storage)
-   - 🛋️ Furniture (Sofas, chairs, tables, beds, wardrobes)
-   - 📚 Books & Stationery (Books, notebooks, pens, organizers)
-   - 🧸 Toys & Games (Board games, puzzles, action figures, dolls)
-   - 🏋️ Sports & Fitness (Dumbbells, yoga mats, cricket bats, bicycles)
-   - 🥫 Grocery & Food (Snacks, beverages, packaged foods, staples)
-   - 👶 Baby Products (Diapers, clothes, toys, strollers, bottles)
-   - 🐶 Pet Supplies (Pet food, toys, grooming products, accessories)
-   - 🚗 Automotive Accessories (Car chargers, seat covers, helmets, cleaners)
-   - 🎮 Gaming (Consoles, controllers, gaming keyboards, headsets, VR)
-   - 🎧 Audio & Accessories (Headphones, earbuds, speakers, microphones)
-   - 👜 Bags & Luggage (Backpacks, handbags, suitcases, travel bags)
-   - 💍 Jewellery (Rings, necklaces, earrings, bracelets)
-   - 🩺 Health & Wellness (Thermometers, fitness trackers, monitors, massagers)
-
-2. **PostgreSQL Database Integration**:
-   - `categories`: Category names, slugs, emojis, and descriptions.
-   - `products`: Product details, categories, prices, badges, ratings, reviews, and stock.
-   - `customers`: Customer profiles and shipping addresses.
-   - `orders`: Order headers, totals, statuses, customer references, and PayPal tracking IDs.
-   - `order_items`: Line items, prices, and quantities per order.
-   - `product_deliveries`: Carrier information (FedEx, DHL, BlueDart, UPS), tracking numbers (`TRK-...`), delivery statuses, and estimated delivery dates.
-   - `delivery_timeline`: Step-by-step transit tracking checkpoints and locations.
-   - `transactions`: Product transaction history (`TXN-...`), payment methods (Credit Card, PayPal, UPI, Apple Pay), amounts, and gateway responses.
-
-3. **Live Product Delivery Tracker (`track_delivery.php`)**:
-   - Search by Tracking Number or Order Number.
-   - Visual multi-step progress bar: *Order Confirmed ➔ Processing ➔ In Transit ➔ Out for Delivery ➔ Delivered*.
-   - Checkpoint timeline showing timestamps, hub locations, and courier notes.
-
-4. **Product Transaction History (`transactions.php`)**:
-   - Financial KPI cards: Total processed volume, successful payments count, pending count, and average order value.
-   - Search and filter by status (*Success*, *Pending*, *Failed*, *Refunded*) and payment method.
-
-5. **User Authentication & Security**:
-   - Secure Registration and Login with password strength enforcement (12+ characters, upper, lower, numbers, symbols).
-   - Session fixation protection, CSRF token verification, and brute-force lockout throttling.
-
-6. **Official PayPal Sandbox Checkout & Order Cancellation**:
-   - Official PayPal Smart Buttons SDK with backend order creation and payment capture.
-   - Zero hardcoded secrets; Client Secret strictly backend-isolated.
-   - Instant order cancellation with automated PayPal REST API refund.
+Designed for **zero-cost cloud deployment** using **Render** (Docker Web Service) and **Neon** (Serverless PostgreSQL Cloud Database).
 
 ---
 
-## 🗄️ PostgreSQL Setup Guide
+## 🌟 Architecture & Tech Stack
 
-### Option 1: Docker (Fastest — 5 seconds)
-
-Run the official PostgreSQL container:
-```bash
-docker run --name pg-ecommerce -e POSTGRES_PASSWORD=your_secure_password_here -e POSTGRES_DB=ecommerce_db -p 5432:5432 -d postgres
+```
+                              ┌──────────────────────────────────────┐
+                              │           Client Browser             │
+                              │     (HTML5 / CSS3 / Vanilla JS)      │
+                              └──────────────────┬───────────────────┘
+                                                 │
+                                                 │ HTTPS / WSS
+                                                 ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                Render Cloud Platform (Free Tier)                                   │
+│  ┌──────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                              Docker Container (php:8.2-apache)                               │  │
+│  │                                                                                              │  │
+│  │   Apache 2.4 (Dynamic Port ${PORT:-10000}) ➔ /var/www/html                                  │  │
+│  │   ├── Frontend Views: index.php, cart.php, checkout.php, track_delivery.php                  │  │
+│  │   ├── Core APIs: chat_api.php, paypal_api.php, health.php                                   │  │
+│  │   ├── Business Services: orders_service.php, paypal_service.php, auth.php                    │  │
+│  │   └── Database Layer: db.php (PDO PostgreSQL with SSL & cold-start retry)                   │  │
+│  └──────────────────────────────┬───────────────────────────────┬───────────────────────────────┘  │
+└─────────────────────────────────┼───────────────────────────────┼──────────────────────────────────┘
+                                  │                               │
+                                  ▼                               ▼
+       ┌────────────────────────────────────┐   ┌───────────────────────────────────┐
+       │     Neon Cloud PostgreSQL (Free)   │   │         External APIs             │
+       │     - Serverless Postgres          │   │  - OpenRouter AI (LLM auto model) │
+       │     - sslmode=require              │   │  - PayPal REST API v2 (Sandbox)   │
+       │     - 20 Categories / 240 Products │   └───────────────────────────────────┘
+       └────────────────────────────────────┘
 ```
 
-Then visit **http://localhost:8000/database_setup.php** and click **"Initialize & Seed PostgreSQL Database"**.
+- **Backend Runtime:** PHP 8.2+ with `pdo_pgsql`, `pgsql`, `opcache`, `curl`, `json`, `mbstring`.
+- **Database:** PostgreSQL (Neon serverless cloud or local PostgreSQL 15/16).
+- **Web Server:** Apache 2.4 with `mod_rewrite`, `mod_headers`, and dynamic `$PORT` binding for container runtimes.
+- **AI Engine:** OpenRouter API (`auto` model routing) with local heuristic typo correction fallback.
+- **Payment Gateway:** PayPal REST API v2 (Orders, Captures, Instant Refunds).
+- **Hosting & Infrastructure:** Render Free Web Service + Neon Free Serverless PostgreSQL.
+- **Containerization:** Docker (`Dockerfile`) and Docker Compose (`docker-compose.yml`).
 
-### Option 2: Local PostgreSQL / pgAdmin
+---
 
-1. Ensure PostgreSQL is installed and listening on port `5432`.
-2. Copy `.env.example` to `.env` and set your database credentials:
-   ```env
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=ecommerce_db
-   DB_USER=postgres
-   DB_PASS=your_secure_password_here
+## 🚀 Live Cloud Deployment Guide (Zero Cost)
+
+Follow these steps to deploy Nexora to the cloud for free using **Render** and **Neon**.
+
+### Step 1: Provision a Free PostgreSQL Database on Neon
+
+1. Visit [Neon.tech](https://neon.tech/) and sign up for a free account.
+2. Click **Create Project**, name it `nexora-db`, select your preferred region (e.g. `US East (Ohio)` or `EU (Frankfurt)`), and click **Create Project**.
+3. In your Neon dashboard, locate the **Connection Details** box.
+4. Copy the **Connection string** (URI format with pooling enabled):
+   ```text
+   postgresql://neondb_owner:YOUR_PASSWORD@ep-sample-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require
    ```
-3. Initialize tables and seed data via CLI:
+5. *(Optional)* Run schema migrations directly from your local terminal or Neon's SQL Editor:
+   - In Neon Dashboard: Go to **SQL Editor**, paste the contents of `database/schema.sql`, and execute it. Then paste and execute `database/seeds.sql`.
+   - *Or* run the CLI installer locally pointing to your Neon database:
+     ```bash
+     DATABASE_URL="your-neon-connection-string" php database/setup.php
+     ```
+
+---
+
+### Step 2: Deploy Application on Render
+
+Render supports Docker web services on its free tier.
+
+#### Method A: Using `render.yaml` Blueprint (One-Click)
+
+1. Push your code to your GitHub repository:
+   ```bash
+   git push origin main
+   ```
+2. Log in to [Render.com](https://render.com/).
+3. Click **New +** ➔ **Blueprint**.
+4. Select your `nexora-paypal-hackathon` repository.
+5. Render will automatically detect `render.yaml`.
+6. Fill in the required environment variables in the prompt:
+   - `DATABASE_URL`: Your Neon connection string (from Step 1).
+   - `PAYPAL_CLIENT_ID`: Your PayPal Sandbox Client ID.
+   - `PAYPAL_CLIENT_SECRET`: Your PayPal Sandbox Secret.
+   - `OPENROUTER_API_KEY`: Your OpenRouter API Key.
+7. Click **Apply**. Render will build the Docker container and deploy the app!
+
+#### Method B: Manual Web Service Setup
+
+1. Log in to [Render.com](https://render.com/).
+2. Click **New +** ➔ **Web Service**.
+3. Connect your GitHub repository.
+4. Configure the settings:
+   - **Name:** `nexora-ai-ecommerce`
+   - **Region:** Same region as your Neon database (e.g. `Oregon (US West)` or `Ohio (US East)`).
+   - **Runtime:** `Docker`
+   - **Dockerfile Path:** `./Dockerfile`
+   - **Instance Type:** `Free` (0.1 CPU, 512 MB RAM)
+5. Scroll down to **Environment Variables** and add:
+   | Key | Value | Description |
+   | :--- | :--- | :--- |
+   | `APP_ENV` | `production` | Enables production error logging and security checks |
+   | `DATABASE_URL` | `postgresql://...` | Neon PostgreSQL connection string (`?sslmode=require`) |
+   | `PAYPAL_CLIENT_ID` | `your_sandbox_client_id` | PayPal Sandbox REST App Client ID |
+   | `PAYPAL_CLIENT_SECRET`| `your_sandbox_secret` | PayPal Sandbox REST App Secret |
+   | `PAYPAL_ENVIRONMENT` | `sandbox` | PayPal API environment |
+   | `OPENROUTER_API_KEY` | `sk-or-v1-...` | OpenRouter API Key for AI Assistant |
+   | `OPENROUTER_MODEL` | `auto` | Auto routes to optimal AI models |
+6. Set **Health Check Path** to `/health.php`.
+7. Click **Create Web Service**.
+8. Once deployment completes, your application will be live at `https://nexora-ai-ecommerce.onrender.com`!
+
+---
+
+## 🐳 Local Development with Docker
+
+To run the complete application and a dedicated PostgreSQL database locally using Docker Compose:
+
+### 1. Clone & Configure
+```bash
+git clone https://github.com/ganesh-sable/nexora-paypal-hackathon.git
+cd nexora-paypal-hackathon
+
+# Copy sample environment configuration
+cp .env.example .env
+```
+Fill in your `OPENROUTER_API_KEY`, `PAYPAL_CLIENT_ID`, and `PAYPAL_CLIENT_SECRET` in `.env`.
+
+### 2. Start Services
+```bash
+docker compose up --build -d
+```
+
+Docker will:
+1. Spin up a `postgres:15-alpine` container, automatically executing `schema.sql` and `seeds.sql`.
+2. Build the PHP 8.2 Apache container with `pdo_pgsql` and OPcache.
+3. Bind the application to port `8000`.
+
+### 3. Open Application
+Navigate to [http://localhost:8000](http://localhost:8000).
+
+To stop the containers:
+```bash
+docker compose down
+```
+
+---
+
+## 💻 Local Development (Native PHP CLI)
+
+If you have PHP 8.2+ installed locally with `pdo_pgsql`:
+
+1. Copy `.env.example` to `.env` and configure your credentials.
+2. Initialize the database:
    ```bash
    php database/setup.php
    ```
-   *Or import directly via psql:*
+3. Start the PHP built-in web server:
    ```bash
-   psql -U postgres -d ecommerce_db -f database/schema.sql
-   psql -U postgres -d ecommerce_db -f database/seeds.sql
-   psql -U postgres -d ecommerce_db -f database/migrations/001_create_auth_tables.sql
-   psql -U postgres -d ecommerce_db -f database/migrations/002_add_paypal_and_cancellation.sql
+   php -S localhost:8000
    ```
+4. Access the web store at [http://localhost:8000](http://localhost:8000).
 
 ---
 
-## 🚀 How to Run the Web Application
+## ⚙️ Environment Variables Reference
 
-Start PHP's built-in web server:
+| Variable | Required | Default | Description |
+| :--- | :---: | :---: | :--- |
+| `APP_ENV` | Optional | `development` | Set to `production` in live deployments to disable error printing. |
+| `DATABASE_URL` | **Yes (Cloud)** | - | Full PostgreSQL connection URI (`postgresql://user:pass@host:5432/db?sslmode=require`). |
+| `DB_HOST` | Local only | `localhost` | PostgreSQL hostname (ignored if `DATABASE_URL` is set). |
+| `DB_PORT` | Local only | `5432` | PostgreSQL port. |
+| `DB_NAME` | Local only | `ecommerce_db` | PostgreSQL database name. |
+| `DB_USER` | Local only | `postgres` | PostgreSQL username. |
+| `DB_PASS` | Local only | - | PostgreSQL password. |
+| `DB_SSLMODE` | Optional | `require` (cloud) | `require` for Neon/cloud, `disable` for local dev. |
+| `PORT` | Container | `10000` | HTTP listening port (automatically set by Render). |
+| `PAYPAL_CLIENT_ID` | **Yes** | - | PayPal REST API Client ID from Developer Dashboard. |
+| `PAYPAL_CLIENT_SECRET` | **Yes** | - | PayPal REST API Secret Key (kept secure on backend). |
+| `PAYPAL_ENVIRONMENT` | Optional | `sandbox` | `sandbox` for testing, `live` for production. |
+| `OPENROUTER_API_KEY` | **Yes** | - | OpenRouter API Key for AI features. |
+| `OPENROUTER_MODEL` | Optional | `auto` | LLM model (`auto` selects the best cost-effective model). |
+
+---
+
+## 🏥 Health Check & Monitoring
+
+Nexora includes an unauthenticated, zero-credential-leak health check endpoint:
+
+**Endpoint:** `GET /health.php`
+
+**Sample Response:**
+```json
+{
+    "status": "ok",
+    "app": "Nexora",
+    "version": "2.0.0",
+    "environment": "production",
+    "timestamp": "2026-11-03T12:00:00Z",
+    "services": {
+        "database": {
+            "status": "connected",
+            "driver": "pdo_pgsql"
+        },
+        "ai_assistant": {
+            "provider": "openrouter",
+            "configured": true
+        },
+        "payments": {
+            "gateway": "paypal",
+            "mode": "sandbox",
+            "configured": true
+        }
+    }
+}
+```
+
+---
+
+## 🧪 Automated Test Suites
+
+The codebase includes comprehensive automated tests covering security, chatbot intent, payments, and gift recommendations:
 
 ```bash
-cd ecommerce-demo
-php -S localhost:8000
+# Run security & authentication test suite (16 tests)
+php tests/auth_test.php
+
+# Run AI chatbot & tool calling test suite
+php tests/chatbot_test.php
+
+# Run PayPal Sandbox & Order Cancellation test suite
+php tests/test_paypal_and_cancel.php
+
+# Run multi-turn AI recommendation test suite (14 scenarios)
+php tests/test_recommendations.php
 ```
 
-Open your browser and navigate to:
-- **Shop / Catalog**: [http://localhost:8000/](http://localhost:8000/)
-- **Delivery Tracking**: [http://localhost:8000/track_delivery.php](http://localhost:8000/track_delivery.php)
-- **Transaction History**: [http://localhost:8000/transactions.php](http://localhost:8000/transactions.php)
-- **Database Management**: [http://localhost:8000/database_setup.php](http://localhost:8000/database_setup.php)
-- **Shopping Cart**: [http://localhost:8000/cart.php](http://localhost:8000/cart.php)
-- **My Account**: [http://localhost:8000/account.php](http://localhost:8000/account.php)
+All 4 test suites run without external dependencies and execute in seconds.
 
 ---
 
-## 🤖 Nexora AI Assistant (Chatbot)
+## 🔒 Security Best Practices Implemented
 
-Nexora features a floating AI shopping assistant with native Function Calling tools and PostgreSQL integration. The widget appears automatically on every page at the bottom-right corner.
-
-### Dual Capabilities
-
-1. **AI Advisor (General Shopping & Gift Intelligence):**
-   - Answers product queries, comparisons, and buying tips (e.g. *"Which laptop is best for coding and gaming?"*, *"Which cookware should I buy?"*).
-   - Handles gift recommendations by asking follow-up questions (occasion, recipient interests, budget) and recommending store products.
-2. **AI Store Assistant (Function Calling / Database Tools):**
-   - 🔍 `search_products(keyword, category, max_price)`: Real-time parameterized search across 240+ products.
-   - 🚚 `track_order(tracking_number_or_order_number)`: Queries live delivery status and courier timeline checkpoints.
-   - 💳 `get_transactions(order_number_or_transaction_id)`: Checks payment gateway records and receipt status.
-   - 🛒 `add_to_cart(product_id, quantity)`: Directly adds recommended products to the cart with dynamic badge updates.
-   - 🛡️ **Store Policy & PayPal Support**: Instant answers for PayPal Express Checkout, 30-day money-back guarantee, and payment options.
-
-### Setup Instructions
-
-Nexora AI Assistant uses **OpenRouter** with **Automatic Model Selection** (`auto`) as the primary LLM provider, and features an integrated offline-resilient intent detection and typo correction engine (`chatbot_intent.php`):
-
-#### OpenRouter Configuration (Recommended)
-1. Obtain an API key from [OpenRouter](https://openrouter.ai/keys) (starts with `sk-or-...`).
-2. Add the configuration to your `.env` file:
-   ```env
-   OPENROUTER_API_KEY=your_openrouter_api_key_here
-   OPENROUTER_MODEL=auto
-   LLM_PROVIDER=openrouter
-   ```
-
-#### Offline / Fallback Resiliency
-Even without an active internet connection or API credits, the built-in **Intelligent Intent & Typo Correction Engine** (`chatbot_intent.php`) guarantees:
-- **Deterministic Typo Correction:** e.g., *"lptop"* ➔ *"laptop"*, *"wtch"* ➔ *"watch"*, *"samsng"* ➔ *"Samsung"*, *"headfones"* ➔ *"headphones"*.
-- **Category Isolation:** Requesting a laptop only returns laptops (no mice, keyboards, or monitors); requesting a watch only returns watches.
-- **Natural Budget & Multi-Turn Context:** Handles *"under 40000"*, *"laptop under 40000"*, and retains previous turn context during multi-turn shopping chats.
-- **Accurate Out-of-Catalog Handling:** Queries for non-existent categories return zero products with a courteous explanatory message.
-
----
-
-## 🅿️ PayPal Sandbox Integration & Order Cancellation
-
-Nexora integrates the official **PayPal Checkout v2 REST API** with backend order capture and instant cancellation refunds:
-
-1. Obtain your sandbox credentials from [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/applications/sandbox).
-2. Add your credentials to `.env`:
-   ```env
-   PAYPAL_CLIENT_ID=your_paypal_sandbox_client_id_here
-   PAYPAL_CLIENT_SECRET=your_paypal_sandbox_client_secret_here
-   PAYPAL_ENVIRONMENT=sandbox
-   ```
-3. Test using a **Personal (Buyer) Sandbox Account** from PayPal's Testing Tools dashboard.
-4. Eligible placed orders can be cancelled with one click from `account.php` or `track_delivery.php`, triggering automatic REST API refunds for captured payments.
-
----
-
-## 📁 Project Structure
-
-```
-ecommerce-demo/
-├── chat_api.php          → AI chat endpoint with function calling & tools
-├── chat_widget.php       → Floating chatbot widget (HTML + Vanilla JS, zero dependencies)
-├── chatbot_intent.php    → Intent detection, typo correction, fuzzy matching & SQL query engine
-├── css/
-│   ├── chat.css          → Chat window, bubbles, product cards & typing animation
-│   └── style.css         → Complete modern styling
-├── auth.php              → Core authentication, password hashing, CSRF & rate limiting
-├── signup.php            → Secure registration with live 12+ char password meter
-├── login.php             → User authentication with brute-force lockout & remember me
-├── logout.php            → POST-only CSRF-verified session destruction
-├── account.php           → Customer dashboard with profile, orders & shipment links
-├── forgot_password.php   → Password reset request with enumeration protection
-├── reset_password.php    → Secure token validation & new password creation
-├── paypal_api.php        → Secure AJAX endpoint for PayPal Smart Buttons
-├── paypal_service.php    → PayPal REST API v2 client (OAuth, orders, captures, refunds)
-├── cancel_order.php      → CSRF-protected order cancellation & refund handler
-├── index.php             → Products catalog with 20 categories & live filters
-├── track_delivery.php    → Shipment tracker with visual stepper & transit checkpoints
-├── transactions.php      → Product transaction history & financial KPI metrics
-├── checkout.php          → Checkout with PayPal Smart Buttons & shipping form
-├── cart.php              → Shopping cart with quantity controls
-├── cart_action.php       → Cart add/remove/adjust actions
-├── database_setup.php    → Web-based PostgreSQL installer and live status panel
-├── config.php            → Database, LLM and application configurations
-├── db.php                → PDO PostgreSQL database connection and query helpers
-├── orders_service.php    → Service layer for orders, deliveries & transactions
-├── products.php          → Product repository with dynamic DB query & fallback
-├── products_data.php     → Master catalog data (20 categories, 240 products)
-├── header.php            → Header with navigation, cart badge & user profile
-├── footer.php            → Footer with navigation and embedded AI chatbot widget
-├── tests/
-│   ├── auth_test.php              → Automated test suite verifying 16 security & auth criteria
-│   ├── chatbot_test.php           → Automated test suite verifying all chatbot capabilities
-│   ├── test_paypal_and_cancel.php → Automated test suite verifying Scenarios A through L
-│   └── test_recommendations.php   → Automated test suite verifying 14 multi-turn scenarios
-└── database/
-    ├── migrations/       → SQL migrations (auth tables, remember tokens, orders.paypal_*)
-    ├── schema.sql        → PostgreSQL DDL (tables, indexes, foreign keys)
-    ├── seeds.sql         → Pre-seeded data (240 products, deliveries, transactions)
-    └── setup.php         → Automated installer script
-```
+- **Credential Isolation:** No credentials, API tokens, or secrets are committed to the repository. All secrets are loaded from environment variables.
+- **Render Port & Proxy Support:** Secure HTTPS cookie flags support `X-Forwarded-Proto: https` from Render's edge load balancer.
+- **SQL Injection Prevention:** 100% of database interactions utilize prepared statements with bound parameters (`PDO`).
+- **CSRF Defense:** Cryptographic constant-time CSRF tokens on all state-changing POST requests (`login.php`, `signup.php`, `checkout.php`, `cancel_order.php`, `database_setup.php`).
+- **Brute Force Defense:** Account lockout after 5 consecutive failed login attempts with progressive throttling.
+- **Password Hashing:** Passwords hashed using standard `password_hash()` with `PASSWORD_DEFAULT` (bcrypt/argon2). Plaintext passwords are never stored or logged.
+- **Safe PayPal Integration:** Client Secret is strictly retained on the backend; only the public Client ID is surfaced to the frontend SDK.

@@ -2,14 +2,19 @@
 $page_title = 'PostgreSQL Database Setup & Diagnostics';
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/database/setup.php';
 
 $message = null;
 $messageType = 'info';
+$csrfToken = Auth::generateCsrfToken();
 
 // Handle initialize action
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
-    if ($_POST['action'] === 'init_db') {
+    if (!Auth::verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $message = "Invalid or expired security token. Please refresh and try again.";
+        $messageType = 'danger';
+    } elseif ($_POST['action'] === 'init_db') {
         $result = run_database_setup(true);
         if ($result['success']) {
             $message = "Database initialized and seeded successfully! 20 Categories, 240 Products, Deliveries, and Transaction History are now active in PostgreSQL.";
@@ -89,6 +94,7 @@ require_once __DIR__ . '/header.php';
             <div style="margin-top:1.5rem;">
                 <form method="POST" style="display:inline-block;width:100%;">
                     <input type="hidden" name="action" value="init_db">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                     <button type="submit" class="btn btn-primary" style="width:100%;padding:0.75rem 1.25rem;">
                         🔄 Initialize & Seed PostgreSQL Database
                     </button>

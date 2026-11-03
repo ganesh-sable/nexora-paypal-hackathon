@@ -23,12 +23,68 @@ if (file_exists($envFile)) {
     }
 }
 
-// Database credentials
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_PORT', getenv('DB_PORT') ?: '5432');
-define('DB_NAME', getenv('DB_NAME') ?: 'ecommerce_db');
-define('DB_USER', getenv('DB_USER') ?: 'postgres');
-define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : '');
+// Database & Application Environment
+define('APP_ENV', strtolower(getenv('APP_ENV') ?: 'development'));
+define('APP_URL', getenv('APP_URL') ?: '');
+define('PORT', getenv('PORT') ?: '10000');
+
+// Configure error reporting based on environment
+if (APP_ENV === 'production') {
+    ini_set('display_errors', '0');
+    ini_set('display_startup_errors', '0');
+    ini_set('log_errors', '1');
+    error_reporting(E_ALL);
+} else {
+    ini_set('display_errors', '1');
+    ini_set('display_startup_errors', '1');
+    error_reporting(E_ALL);
+}
+
+// Database credentials & Neon connection string support
+$databaseUrl = getenv('DATABASE_URL') ?: getenv('DB_URL');
+$parsedSslMode = getenv('DB_SSLMODE') ?: '';
+
+if ($databaseUrl) {
+    $dbParts = parse_url($databaseUrl);
+    if ($dbParts) {
+        $parsedHost = $dbParts['host'] ?? 'localhost';
+        $parsedPort = isset($dbParts['port']) ? (string)$dbParts['port'] : '5432';
+        $parsedUser = isset($dbParts['user']) ? urldecode($dbParts['user']) : 'postgres';
+        $parsedPass = isset($dbParts['pass']) ? urldecode($dbParts['pass']) : '';
+        $parsedName = isset($dbParts['path']) ? ltrim($dbParts['path'], '/') : 'ecommerce_db';
+        
+        if (!empty($dbParts['query'])) {
+            parse_str($dbParts['query'], $queryArgs);
+            if (!empty($queryArgs['sslmode'])) {
+                $parsedSslMode = $queryArgs['sslmode'];
+            }
+        }
+
+        define('DATABASE_URL', $databaseUrl);
+        define('DB_HOST', getenv('DB_HOST') ?: $parsedHost);
+        define('DB_PORT', getenv('DB_PORT') ?: $parsedPort);
+        define('DB_NAME', getenv('DB_NAME') ?: $parsedName);
+        define('DB_USER', getenv('DB_USER') ?: $parsedUser);
+        define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : $parsedPass);
+        define('DB_SSLMODE', $parsedSslMode);
+    } else {
+        define('DATABASE_URL', $databaseUrl);
+        define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+        define('DB_PORT', getenv('DB_PORT') ?: '5432');
+        define('DB_NAME', getenv('DB_NAME') ?: 'ecommerce_db');
+        define('DB_USER', getenv('DB_USER') ?: 'postgres');
+        define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : '');
+        define('DB_SSLMODE', $parsedSslMode);
+    }
+} else {
+    define('DATABASE_URL', '');
+    define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+    define('DB_PORT', getenv('DB_PORT') ?: '5432');
+    define('DB_NAME', getenv('DB_NAME') ?: 'ecommerce_db');
+    define('DB_USER', getenv('DB_USER') ?: 'postgres');
+    define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : '');
+    define('DB_SSLMODE', $parsedSslMode);
+}
 
 // AI Chatbot Configuration (OpenRouter by default)
 define('OPENROUTER_API_KEY', getenv('OPENROUTER_API_KEY') ?: (getenv('LLM_API_KEY') ?: ''));
@@ -54,7 +110,8 @@ if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.use_only_cookies', '1');
 
     $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
+        || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
 
     session_set_cookie_params([
         'lifetime' => 0,

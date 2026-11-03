@@ -1,0 +1,26 @@
+# Render Blueprint Specification for Nexora AI E-Commerce Platform
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: nexora-ai-ecommerce
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health.php
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # Add your Neon PostgreSQL connection string in the Render Dashboard
+      - key: PAYPAL_CLIENT_ID
+        sync: false # Your PayPal Sandbox REST App Client ID
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false # Your PayPal Sandbox REST App Client Secret
+      - key: PAYPAL_ENVIRONMENT
+        value: sandbox
+      - key: OPENROUTER_API_KEY
+        sync: false # Your OpenRouter API Key for AI features
+      - key: OPENROUTER_MODEL
+        value: auto

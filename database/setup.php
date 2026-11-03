@@ -21,39 +21,54 @@ function run_database_setup(bool $forceReset = false): array {
     }
 
     // Step 1: Check or create database
+    $sslMode = defined('DB_SSLMODE') ? DB_SSLMODE : '';
+    if (empty($sslMode) && (str_contains(DB_HOST, 'neon.tech') || str_contains(DB_HOST, 'render.com') || str_contains(DB_HOST, 'supabase.co'))) {
+        $sslMode = 'require';
+    }
+
+    $dsn = sprintf("pgsql:host=%s;port=%s;dbname=%s", DB_HOST, DB_PORT, DB_NAME);
+    if (!empty($sslMode)) {
+        $dsn .= ";sslmode=" . $sslMode;
+    }
+
     try {
         // Try connecting to target DB directly
-        $dsn = sprintf("pgsql:host=%s;port=%s;dbname=%s", DB_HOST, DB_PORT, DB_NAME);
         $pdo = new PDO($dsn, DB_USER, DB_PASS, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 3
+            PDO::ATTR_TIMEOUT => 10
         ]);
         $results['messages'][] = "Connected directly to database '" . DB_NAME . "'.";
     } catch (PDOException $e) {
-        // Try connecting to default 'postgres' database to create ecommerce_db
-        try {
-            $adminDsn = sprintf("pgsql:host=%s;port=%s;dbname=postgres", DB_HOST, DB_PORT);
-            $adminPdo = new PDO($adminDsn, DB_USER, DB_PASS, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_TIMEOUT => 3
-            ]);
-            $results['messages'][] = "Connected to maintenance database 'postgres'. Creating '" . DB_NAME . "'...";
-            
-            // Check if DB exists
-            $stmt = $adminPdo->prepare("SELECT 1 FROM pg_database WHERE datname = ?");
-            $stmt->execute([DB_NAME]);
-            if (!$stmt->fetch()) {
-                $adminPdo->exec("CREATE DATABASE \"" . DB_NAME . "\"");
-                $results['messages'][] = "Database '" . DB_NAME . "' created successfully!";
-            }
+        $sanitizedError = preg_replace('/(password|pass|pwd)=([^\s;]+)/i', '$1=****', $e->getMessage());
+        // For local development on localhost/127.0.0.1, try connecting to default 'postgres' database to create ecommerce_db
+        if (in_array(DB_HOST, ['localhost', '127.0.0.1', 'postgres'])) {
+            try {
+                $adminDsn = sprintf("pgsql:host=%s;port=%s;dbname=postgres", DB_HOST, DB_PORT);
+                $adminPdo = new PDO($adminDsn, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_TIMEOUT => 5
+                ]);
+                $results['messages'][] = "Connected to maintenance database 'postgres'. Creating '" . DB_NAME . "'...";
+                
+                // Check if DB exists
+                $stmt = $adminPdo->prepare("SELECT 1 FROM pg_database WHERE datname = ?");
+                $stmt->execute([DB_NAME]);
+                if (!$stmt->fetch()) {
+                    $adminPdo->exec("CREATE DATABASE \"" . DB_NAME . "\"");
+                    $results['messages'][] = "Database '" . DB_NAME . "' created successfully!";
+                }
 
-            // Connect to newly created database
-            $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_TIMEOUT => 3
-            ]);
-        } catch (PDOException $adminEx) {
-            $results['error'] = "Failed to connect to PostgreSQL server at " . DB_HOST . ":" . DB_PORT . " - " . $adminEx->getMessage();
+                // Connect to newly created database
+                $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_TIMEOUT => 5
+                ]);
+            } catch (PDOException $adminEx) {
+                $results['error'] = "Failed to connect to PostgreSQL server at " . DB_HOST . ":" . DB_PORT . " - " . $adminEx->getMessage();
+                return $results;
+            }
+        } else {
+            $results['error'] = "Failed to connect to remote PostgreSQL database at " . DB_HOST . ":" . DB_PORT . " - " . $sanitizedError;
             return $results;
         }
     }

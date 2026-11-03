@@ -67,11 +67,14 @@ if (!$order_placed && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !empty($c
         ];
 
         // Create order with user linkage, delivery tracking & transaction history
-        $order_details = OrdersService::createOrder($customerData, $cart_items, $subtotal, $paymentData, (int)$currentUser['id']);
-
-        // Clear cart
-        $_SESSION['cart'] = [];
-        $order_placed = true;
+        try {
+            $order_details = OrdersService::createOrder($customerData, $cart_items, $subtotal, $paymentData, (int)$currentUser['id']);
+            // Clear cart
+            $_SESSION['cart'] = [];
+            $order_placed = true;
+        } catch (Exception $e) {
+            $checkoutError = 'Unable to process order: ' . $e->getMessage();
+        }
     }
 }
 

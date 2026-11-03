@@ -1,0 +1,28 @@
+# Nexora E-Commerce Platform - Apache Security Configuration
+
+# Disable directory browsing
+Options -Indexes +FollowSymLinks
+
+# Deny access to hidden files and directories (like .env, .git)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Protect database dumps, logs, shell scripts and markdown documentation
+<FilesMatch "\.(sql|log|sh|md)$">
+    Require all denied
+</FilesMatch>
+
+# Protect specific sensitive files
+<Files "docker-entrypoint.sh">
+    Require all denied
+</Files>
+<Files "render.yaml">
+    Require all denied
+</Files>
+<Files "Dockerfile">
+    Require all denied
+</Files>
+<Files "docker-compose.yml">
+    Require all denied
+</Files>
